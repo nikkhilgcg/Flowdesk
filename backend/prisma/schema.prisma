@@ -1,0 +1,143 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role { 
+  MANAGER 
+  ASSIGNEE 
+  CLIENT 
+}
+
+enum Status { 
+  TODO 
+  IN_PROGRESS 
+  IN_REVIEW 
+  APPROVED 
+}
+
+enum Priority { 
+  HIGH 
+  MEDIUM 
+  LOW 
+}
+
+enum EventType { 
+  CREATED 
+  STATUS 
+  ASSIGNED 
+  COMMENT 
+  }
+
+// Every client belongs to the manager who created it. A manager only sees processes of their own clients.
+model Client {
+  id        Int       @id @default(autoincrement())
+  name      String
+  managerId Int?
+  manager   User?     @relation("managedClients", fields: [managerId], references: [id])
+  users     User[]    @relation("clientUsers")
+  processes Process[]
+
+  @@unique([managerId, name])
+  @@index([managerId])
+}
+
+model User {
+  id           Int            @id @default(autoincrement())
+  name         String
+  email        String         @unique
+  passwordHash String
+  role         Role
+  clientId     Int?
+  client       Client?        @relation("clientUsers", fields: [clientId], references: [id])
+  managedClients Client[]     @relation("managedClients")
+  createdAt    DateTime       @default(now())
+  assigned     Process[]      @relation("assignee")
+  events       ProcessEvent[]
+  notifications     Notification[] @relation("notified")
+  notificationsSent Notification[] @relation("notifier")
+  attachments       Attachment[]
+}
+
+model Process {
+  id          Int            @id @default(autoincrement())
+  title       String
+  description String         @default("")
+  priority    Priority       @default(MEDIUM)
+  dueDate     DateTime?
+  status      Status         @default(TODO)
+  reworkCount Int            @default(0)
+  clientId    Int
+  client      Client         @relation(fields: [clientId], references: [id])
+  assigneeId  Int?
+  assignee    User?          @relation("assignee", fields: [assigneeId], references: [id])
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  events      ProcessEvent[]
+  notifications Notification[]
+  attachments Attachment[]
+
+  @@index([clientId])
+  @@index([assigneeId])
+}
+
+model ProcessEvent {
+  id         Int       @id @default(autoincrement())
+  processId  Int
+  process    Process   @relation(fields: [processId], references: [id], onDelete: Cascade)
+  actorId    Int
+  actor      User      @relation(fields: [actorId], references: [id])
+  type       EventType
+  fromStatus Status?
+  toStatus   Status?
+  body       String?
+  mentions   Int[]     @default([])
+  notifications Notification[]
+  attachments Attachment[]
+  createdAt  DateTime  @default(now())
+
+  @@index([processId])
+}
+
+model Notification {
+  id        Int          @id @default(autoincrement())
+  type      String       @default("MENTION")
+  userId    Int
+  user      User         @relation("notified", fields: [userId], references: [id])
+  actorId   Int
+  actor     User         @relation("notifier", fields: [actorId], references: [id])
+  processId Int
+  process   Process      @relation(fields: [processId], references: [id], onDelete: Cascade)
+  eventId   Int
+  event     ProcessEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  readAt    DateTime?
+  createdAt DateTime     @default(now())
+
+  @@index([userId, readAt])
+}
+
+// Images added to a ticket. The bytes live in Postgres, so they are backed up with the rest of the data.
+// processId is null while the ticket is still being created (visible to the uploader only).
+model Attachment {
+  id         Int      @id @default(autoincrement())
+  mime       String
+  size       Int
+  data       Bytes
+  uploaderId Int
+  uploader   User     @relation(fields: [uploaderId], references: [id])
+  processId  Int?
+  process    Process? @relation(fields: [processId], references: [id], onDelete: Cascade)
+  // Images sent with a comment. inComment is true from upload; eventId is set once the comment is posted.
+  inComment  Boolean  @default(false)
+  eventId    Int?
+  event      ProcessEvent? @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+
+  @@index([processId])
+  @@index([eventId])
+  @@index([uploaderId])
+}

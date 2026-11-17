@@ -1,0 +1,50 @@
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: flowdesk
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-flowdesk}
+      POSTGRES_DB: flowdesk
+    ports: ["127.0.0.1:5432:5432"]   # reachable from this machine only, never from the network
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U flowdesk -d flowdesk"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build: ./backend
+    environment:
+      DATABASE_URL: postgresql://flowdesk:${DB_PASSWORD:-flowdesk}@db:5432/flowdesk
+      JWT_SECRET: ${JWT_SECRET:-dev-only-change-me-please}
+      PORT: "4000"
+      SEED_DEMO: ${SEED_DEMO:-true}   # loads the demo people only while the database is empty
+    ports: ["127.0.0.1:4000:4000"]
+    depends_on:
+      db:
+        condition: service_healthy
+
+  web:
+    build: ./frontend
+    ports: ["8080:80"]
+    depends_on: [backend]
+
+  # Database admin UI. Off by default: docker compose --profile tools up -d
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    profiles: ["tools"]
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@gmail.com
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin}
+      PGADMIN_CONFIG_SERVER_MODE: "False"            # single-user mode, no extra login (localhost only)
+      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: "False"
+    ports: ["127.0.0.1:5050:80"]
+    volumes:
+      - ./pgadmin/servers.json:/pgadmin4/servers.json:ro
+      - pgadmin:/var/lib/pgadmin
+    depends_on: [db]
+
+volumes:
+  pgdata:
+  pgadmin:
