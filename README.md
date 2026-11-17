@@ -12,10 +12,10 @@ Real people sign up themselves at `/register` (see Registering real users).
 docker compose up --build
 ```
 
-Open http://localhost:8080. On first start the backend creates the tables and loads the demo people.
+Open http://localhost:8080. On first start the backend creates the tables. Open **Register**, choose **Manager** and create your own account. To try the demo people instead, start with `SEED_DEMO=true` (see `DEMO_USERS.txt`).
 
 - `JWT_SECRET=<long random string> docker compose up --build` sets a real secret.
-- `SEED_DEMO=false docker compose up` skips the demo people. The seed also skips itself whenever the database already has users.
+- `SEED_DEMO=true docker compose up --build` loads the demo people (off by default). The seed also skips itself whenever the database already has users.
 - `docker compose down` stops everything and keeps the data. Add `-v` to delete the database volume.
 - Services: web (nginx, port 8080, proxies `/api` to the backend), backend (port 4000), db (Postgres, port 5432).
 
@@ -99,17 +99,17 @@ Only the web port (8080) is meant to be reachable by users.
 
 ## Registering real users
 
-- `/register` asks for email, password and confirm password (at least 8 characters). The name is made from the email
-  (`riya.mehta@acme.com` becomes Riya Mehta) and a manager can correct it. After signing up the person is signed in.
-- Nobody can choose their own role. A new account has no role or client, so it sees nothing and shows a
-  "waiting for access" page. Managers open **People** in the top bar (a badge shows how many are waiting), pick a role
-  (and a client for client users), and click Save. The person clicks **Check again** or signs in again.
-- **The first account created on an empty database becomes the manager.** Start with `SEED_DEMO=false`, register
-  your own account first, then invite everyone else. On a database that already has the demo users, the first real manager
-  must be set up by an existing manager (demo manager: riya@flowdesk.test), then delete the demo users.
+- `/register` asks for full name, role (Employee, Manager or Client), email, password and confirm password (at least 8 characters).
+  After signing up the person is signed in.
+- Employees and managers can start straight away. A **client** user sees a "waiting for access" page until a manager opens **People**
+  (a badge shows how many are waiting), picks one of their own clients for them, and clicks Save. The person clicks **Check again**
+  or signs in again.
+- The role is chosen at sign-up and cannot be changed in the app. If someone picks the wrong one, fix or delete the user in the database
+  (pgAdmin or Prisma Studio).
+- **Anyone can register as a Manager.** A new manager owns no clients, so they see nothing of other managers, but for a public deployment
+  you should restrict manager sign-up (invite code or admin approval) before going live.
 - Registration is limited to 10 attempts per visitor every 15 minutes. Emails are **not verified** (no mail server is set up),
-  so a person can register with an address they do not own, but they still see nothing until a manager approves them.
-  Check that the email is the right person before choosing a role. Add email verification before opening this to the public.
+  so a person can register with an address they do not own. Add email verification before opening this to the public.
 
 ## Image attachments
 
