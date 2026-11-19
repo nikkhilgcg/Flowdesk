@@ -236,3 +236,4 @@ td .dd{min-width:150px}.decide .dd{width:200px}
 .roles button.on{border-color:var(--ac);background:var(--as);box-shadow:0 0 0 1px var(--ac)}
 .roles button:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
 @media (max-width:600px){.g2{grid-template-columns:1fr}.lc.wide{padding:22px 20px}}
+.descbtn{margin-top:8px;font-size:14px}.descedit label{margin-top:0}.descedit .mw textarea{width:100%}

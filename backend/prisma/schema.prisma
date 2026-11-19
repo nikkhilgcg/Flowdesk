@@ -7,8 +7,11 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// SUPER_MANAGER is never offered at registration. Promote a manager by hand:
+//   UPDATE "User" SET role = 'SUPER_MANAGER' WHERE email = '...';
 enum Role { 
   MANAGER 
+  SUPER_MANAGER 
   ASSIGNEE 
   CLIENT 
 }
@@ -31,6 +34,7 @@ enum EventType {
   STATUS 
   ASSIGNED 
   COMMENT 
+  DESCRIPTION 
   }
 
 // Every client belongs to the manager who created it. A manager only sees processes of their own clients.
@@ -74,7 +78,7 @@ model Process {
   clientId    Int
   client      Client         @relation(fields: [clientId], references: [id])
   assigneeId  Int?
-  assignee    User?          @relation("assignee", fields: [assigneeId], references: [id])
+  assignee    User?          @relation("assignee", fields: [assigneeId], references: [id], onDelete: SetNull)
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
   events      ProcessEvent[]
@@ -89,8 +93,9 @@ model ProcessEvent {
   id         Int       @id @default(autoincrement())
   processId  Int
   process    Process   @relation(fields: [processId], references: [id], onDelete: Cascade)
-  actorId    Int
-  actor      User      @relation(fields: [actorId], references: [id])
+  // null once that user is deleted: the app then shows "Deleted user"
+  actorId    Int?
+  actor      User?     @relation(fields: [actorId], references: [id], onDelete: SetNull)
   type       EventType
   fromStatus Status?
   toStatus   Status?
@@ -107,9 +112,9 @@ model Notification {
   id        Int          @id @default(autoincrement())
   type      String       @default("MENTION")
   userId    Int
-  user      User         @relation("notified", fields: [userId], references: [id])
-  actorId   Int
-  actor     User         @relation("notifier", fields: [actorId], references: [id])
+  user      User         @relation("notified", fields: [userId], references: [id], onDelete: Cascade)
+  actorId   Int?
+  actor     User?        @relation("notifier", fields: [actorId], references: [id], onDelete: SetNull)
   processId Int
   process   Process      @relation(fields: [processId], references: [id], onDelete: Cascade)
   eventId   Int
@@ -127,8 +132,8 @@ model Attachment {
   mime       String
   size       Int
   data       Bytes
-  uploaderId Int
-  uploader   User     @relation(fields: [uploaderId], references: [id])
+  uploaderId Int?
+  uploader   User?    @relation(fields: [uploaderId], references: [id], onDelete: SetNull)
   processId  Int?
   process    Process? @relation(fields: [processId], references: [id], onDelete: Cascade)
   // Images sent with a comment. inComment is true from upload; eventId is set once the comment is posted.

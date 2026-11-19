@@ -22,13 +22,15 @@ export default function Board() {
 
   useEffect(() => { api("/processes").then(setItems).catch((e) => setErr(e.message)); }, []);
   const L = useMemo(
-    () => (items || []).filter((p) => (p.key + p.title + p.client.name).toLowerCase().includes(q.toLowerCase())),
+    () => (items || []).filter((p) => (p.key + p.title + p.client.name + (p.client.owner ?? "") + (p.assignee?.name ?? "")).toLowerCase().includes(q.toLowerCase())),
     [items, q]
   );
   if (err) return <main className="wrap"><div className="empty">{err}</div></main>;
   if (!items) return <main className="wrap"><div className="empty">Loading…</div></main>;
 
   const isClient = user.role === "CLIENT";
+  const sup = user.role === "SUPER_MANAGER";   // sees everything, view only
+  const cname = (p) => (sup && p.client.owner ? `${p.client.name} · ${p.client.owner}` : p.client.name);
   const count = (s) => L.filter((p) => p.status === s).length;
   const mentioned = L.filter((p) => p.mention).sort((a, b) => new Date(b.mention.at) - new Date(a.mention.at));
   const mentionTotal = items.filter((p) => p.mention).length;
@@ -51,7 +53,7 @@ export default function Board() {
       )}
 
       <div className="bar">
-        <input className="search" aria-label="Search processes" placeholder="Search by ID, title or client" value={q} onChange={(e) => setQ(e.target.value)} />
+        <input className="search" aria-label="Search processes" placeholder="Search by ID, title, client or assignee" value={q} onChange={(e) => setQ(e.target.value)} />
         {tab === "all" && (
           <div className="seg" role="group" aria-label="View">
             <button className={view === "board" ? "on" : ""} onClick={() => setView("board")}>Board</button>
@@ -60,7 +62,7 @@ export default function Board() {
         )}
         <span className="sp" />
         {user.role === "MANAGER" && <button className="btn g" onClick={() => setAddingClient(true)}>+ Add client</button>}
-        <button className="btn" onClick={() => setOpen(true)}>+ New process</button>
+        {!sup && <button className="btn" onClick={() => setOpen(true)}>+ New process</button>}
       </div>
 
       {tab === "mentions" ? (
@@ -68,7 +70,7 @@ export default function Board() {
           {mentioned.map((p) => (
             <Link className="card mrow" to={`/${p.key}`} key={p.key}>
               <div className="row">
-                <span className="id">{p.key}{!isClient && <> · {p.client.name}</>}</span>
+                <span className="id">{p.key}{!isClient && <> · {cname(p)}</>}</span>
                 <span className={`st ${SL[p.status].css}`}>{SL[p.status].label}</span>
               </div>
               <div className="ct">{p.title}</div>
@@ -87,7 +89,7 @@ export default function Board() {
                 <Link className="card" to={`/${p.key}`} key={p.key}>
                   <div className="row">
                     <span className="id">{p.key}</span>
-                    {!isClient && <span className="chip">{p.client.name}</span>}
+                    {!isClient && <span className="chip">{cname(p)}</span>}
                   </div>
                   <div className="ct">{p.title}</div>
                   {p.mention && <div className="mt">@ Mentions you</div>}
@@ -114,7 +116,7 @@ export default function Board() {
                 <tr key={p.key} onClick={() => nav(`/${p.key}`)}>
                   <td className="id">{p.key}</td>
                   <td className="strong">{p.title}</td>
-                  {!isClient && <td>{p.client.name}</td>}
+                  {!isClient && <td>{cname(p)}</td>}
                   <td>{p.assignee?.name ?? "Unassigned"}</td>
                   <td><Prio p={p.priority} /></td>
                   <td>{fdate(p.dueDate)}</td>

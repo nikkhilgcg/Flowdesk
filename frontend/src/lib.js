@@ -10,7 +10,7 @@ export const PRIO = {
   MEDIUM: { label: "Medium", css: "med" },
   LOW: { label: "Low", css: "low" },
 };
-export const ROLE_LABEL = { MANAGER: "Manager", ASSIGNEE: "Employee", CLIENT: "Client" };
+export const ROLE_LABEL = { SUPER_MANAGER: "Super Manager", MANAGER: "Manager", ASSIGNEE: "Employee", CLIENT: "Client" };
 
 export const fmt = (d) =>
   new Date(d).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
@@ -30,6 +30,7 @@ export function dueText(d, done) {
 export const initials = (n) => n.split(" ").map((x) => x[0]).join("").slice(0, 2).toUpperCase();
 
 export function scopeText(u) {
+  if (u.role === "SUPER_MANAGER") return { title: "All processes", sub: "You can see every process of every client, manager and employee. View only." };
   if (u.role === "MANAGER") return { title: "All processes", sub: "You can see every client’s processes. Approve, reject and assign from each ticket." };
   if (u.role === "ASSIGNEE") return { title: "My assigned processes", sub: "Processes assigned to you, or where someone mentioned you, across clients." };
   return { title: `${u.client} processes`, sub: `Private to ${u.client}. Processes of other clients are never visible to you.` };
