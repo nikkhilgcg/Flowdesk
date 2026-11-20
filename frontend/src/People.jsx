@@ -34,7 +34,7 @@ function Row({ u, clients, me, onSaved }) {
       <td>
         {isClient ? (
           <Dropdown ariaLabel={`Client for ${u.email}`} value={f.clientId} onChange={(v) => set("clientId", v)} placeholder="Choose a client"
-            options={clients.map((c) => ({ value: c.id, label: c.name }))} />
+            options={clients.map((c) => ({ value: c.id, label: c.name, sub: c.owner ? `Managed by ${c.owner}` : undefined }))} />
         ) : <span className="note">Not needed</span>}
       </td>
       <td>{u.pending && <span className="pend">Needs a client</span>}<div className="mq">{fmt(u.createdAt)}</div></td>
@@ -55,7 +55,7 @@ export default function People() {
   useEffect(() => {
     Promise.all([api("/users"), api("/meta")]).then(([l, m]) => { setList(l); setClients(m.clients); }).catch((e) => setErr(e.message));
   }, []);
-  if (user.role !== "MANAGER") return <main className="wrap"><div className="empty">Managers only.</div></main>;
+  if (user.role !== "MANAGER" && user.role !== "SUPER_MANAGER") return <main className="wrap"><div className="empty">Managers only.</div></main>;
   if (err) return <main className="wrap"><div className="empty">{err}</div></main>;
   if (!list) return <main className="wrap"><div className="empty">Loading…</div></main>;
 

@@ -158,7 +158,7 @@ export default function Ticket() {
     api(`/processes/${key}`).then((d) => { setP(d); setMissing(false); }).catch(() => setMissing(true));
   }, [key]);
   useEffect(() => { setRej(false); setEditing(false); setErr(""); load(); }, [load]);
-  useEffect(() => { if (user.role === "MANAGER") api("/meta").then(setMeta); }, [user]);
+  useEffect(() => { if (user.role === "MANAGER" || user.role === "SUPER_MANAGER") api("/meta").then(setMeta); }, [user]);
 
   const addImages = useCallback(async (files) => {
     setErr("");
@@ -173,7 +173,6 @@ export default function Ticket() {
   // Pasting a screenshot anywhere on this page adds it to the ticket (text pastes are left alone).
   useEffect(() => {
     const onPaste = (e) => {
-      if (user.role === "SUPER_MANAGER") return;   // view only
       if (e.target.closest?.(".cwrap")) return;   // pasting into the comment box adds to the comment instead
       const fs = clipboardImages(e);
       if (fs.length) { e.preventDefault(); addImages(fs); }
@@ -192,8 +191,7 @@ export default function Ticket() {
     );
   if (!p) return <main className="wrap"><div className="empty">Loading…</div></main>;
 
-  const mgr = user.role === "MANAGER";
-  const ro = user.role === "SUPER_MANAGER";   // super manager: can see everything, change nothing
+  const mgr = user.role === "MANAGER" || user.role === "SUPER_MANAGER";   // a super manager can do everything a manager can, on every process
   const run = async (fn) => {
     setErr("");
     try { await fn(); load(); return true; } catch (e) { setErr(e.message); return false; }
@@ -216,7 +214,6 @@ export default function Ticket() {
   return (
     <main className="wrap">
       <nav className="crumb"><Link to="/">Processes</Link> <span>/</span> {p.key}</nav>
-      {ro && <div className="note lock" style={{ marginBottom: 12 }}>View only. As a super manager you can see this process but not edit it. You can still delete it.</div>}
       <div className="dg">
         <div>
           <section className="pn">
@@ -244,7 +241,7 @@ export default function Ticket() {
                       ids={p.events.filter((e) => e.type === "CREATED" || e.type === "DESCRIPTION").flatMap((e) => e.mentions ?? [])}
                       people={p.people} meId={user.id} />
                   : "No description."}</p>
-                {!ro && !(p.status === "APPROVED" && user.role === "ASSIGNEE") && (
+                {!(p.status === "APPROVED" && user.role === "ASSIGNEE") && (
                   <button className="lnk descbtn" onClick={() => { setDraft(p.description ?? ""); setErr(""); setEditing(true); }}>
                     {p.description ? "Edit description" : "Add a description"}
                   </button>
@@ -266,7 +263,7 @@ export default function Ticket() {
                 ))}
               </div>
             )}
-            {!ro && !(p.status === "APPROVED" && user.role === "ASSIGNEE") && p.attachments.length < 10 && (
+            {!(p.status === "APPROVED" && user.role === "ASSIGNEE") && p.attachments.length < 10 && (
               <div className="attbar">
                 <button className="lnk" onClick={() => pick.current.click()} disabled={adding > 0}>{adding ? "Uploading…" : "Add image"}</button>
                 <span>or paste a screenshot</span>
@@ -299,7 +296,7 @@ export default function Ticket() {
 
           <section className="pn">
             <h3>Activity</h3>
-            {!ro && <CommentBox pkey={p.key} people={p.people} onSend={(body, attachmentIds) => run(() => api(`/processes/${p.key}/comments`, { method: "POST", body: { body, attachmentIds } }))} />}
+            {<CommentBox pkey={p.key} people={p.people} onSend={(body, attachmentIds) => run(() => api(`/processes/${p.key}/comments`, { method: "POST", body: { body, attachmentIds } }))} />}
             <div className="tl">
               {[...p.events].reverse().map((e) => (
                 <div className={`ev ${e.type === "COMMENT" ? "c" : ""}`} key={e.id}>
@@ -334,12 +331,12 @@ export default function Ticket() {
           <dl>
             <dt>Status</dt>
             <dd>
-              <Dropdown ariaLabel="Change status" value={p.status} disabled={ro || (p.status === "APPROVED" && !decider)} onChange={pickStatus}
+              <Dropdown ariaLabel="Change status" value={p.status} disabled={p.status === "APPROVED" && !decider} onChange={pickStatus}
                 options={STATUSES.map((s) => ({
                   value: s.key, label: s.label,
                   disabled: s.key === "APPROVED" ? p.status !== "APPROVED" : s.key === "TODO" && p.status === "IN_REVIEW" && !decider,
                 }))} />
-              {p.status === "APPROVED" && !decider && !ro && <div className="note lock">Approved and locked. A manager or the client can reopen it.</div>}
+              {p.status === "APPROVED" && !decider && <div className="note lock">Approved and locked. A manager or the client can reopen it.</div>}
             </dd>
             <dt>Client</dt><dd>{p.client.name}</dd>
             <dt>Assignee</dt>

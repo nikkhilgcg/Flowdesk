@@ -29,7 +29,7 @@ export default function Board() {
   if (!items) return <main className="wrap"><div className="empty">Loading…</div></main>;
 
   const isClient = user.role === "CLIENT";
-  const sup = user.role === "SUPER_MANAGER";   // sees everything, view only
+  const sup = user.role === "SUPER_MANAGER";   // sees and manages everything
   const cname = (p) => (sup && p.client.owner ? `${p.client.name} · ${p.client.owner}` : p.client.name);
   const count = (s) => L.filter((p) => p.status === s).length;
   const mentioned = L.filter((p) => p.mention).sort((a, b) => new Date(b.mention.at) - new Date(a.mention.at));
@@ -61,8 +61,8 @@ export default function Board() {
           </div>
         )}
         <span className="sp" />
-        {user.role === "MANAGER" && <button className="btn g" onClick={() => setAddingClient(true)}>+ Add client</button>}
-        {!sup && <button className="btn" onClick={() => setOpen(true)}>+ New process</button>}
+        {(user.role === "MANAGER" || sup) && <button className="btn g" onClick={() => setAddingClient(true)}>+ Add client</button>}
+        <button className="btn" onClick={() => setOpen(true)}>+ New process</button>
       </div>
 
       {tab === "mentions" ? (

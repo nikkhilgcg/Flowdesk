@@ -24,7 +24,8 @@ function Waiting({ user }) {
 function Shell() {
   const { user, ready, logout } = useAuth();
   const [waiting, setWaiting] = useState(0);
-  const mgr = user?.role === "MANAGER";
+  const mgr = user?.role === "MANAGER" || user?.role === "SUPER_MANAGER";
+
   // Managers see how many registered people still need a role.
   useEffect(() => { if (mgr) api("/users").then((l) => setWaiting(l.filter((x) => x.pending).length)).catch(() => {}); }, [mgr]);
   if (!ready) return null;

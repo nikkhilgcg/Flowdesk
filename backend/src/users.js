@@ -7,7 +7,7 @@ import { h, HttpError, publicUser } from "./util.js";
 // users of their own clients. They never see other managers or other managers' client users.
 export const usersRouter = Router();
 
-usersRouter.use((req, _res, next) => (req.user.role === "MANAGER" ? next() : next(new HttpError(403, "Managers only"))));
+usersRouter.use((req, _res, next) => (req.user.role === "MANAGER" || req.user.role === "SUPER_MANAGER" ? next() : next(new HttpError(403, "Managers only"))));
 
 const row = (u) => ({ ...publicUser(u), clientId: u.clientId, createdAt: u.createdAt });
 
@@ -15,7 +15,10 @@ usersRouter.get(
   "/",
   h(async (req, res) => {
     const rows = await prisma.user.findMany({
-      where: { OR: [{ role: "ASSIGNEE" }, { role: "CLIENT", clientId: null }, { role: "CLIENT", client: { managerId: req.user.id } }] },
+      // A super manager sees every employee and every client user.
+      where: req.user.role === "SUPER_MANAGER"
+        ? { role: { in: ["ASSIGNEE", "CLIENT"] } }
+        : { OR: [{ role: "ASSIGNEE" }, { role: "CLIENT", clientId: null }, { role: "CLIENT", client: { managerId: req.user.id } }] },
       include: { client: true },
       orderBy: { createdAt: "desc" },
     });
@@ -37,10 +40,11 @@ usersRouter.patch(
     if (!Number.isInteger(id)) throw new HttpError(400, "Bad id");
     const b = patchSchema.parse(req.body);
     const u = await prisma.user.findUnique({ where: { id }, include: { client: true } });
-    const mine = u && u.role === "CLIENT" && (!u.clientId || u.client?.managerId === req.user.id);
+    const sup = req.user.role === "SUPER_MANAGER";
+    const mine = u && u.role === "CLIENT" && (sup || !u.clientId || u.client?.managerId === req.user.id);
     if (!mine) throw new HttpError(404, "User not found");
     const clientId = b.clientId === undefined ? u.clientId : b.clientId;
-    if (clientId && !(await prisma.client.findFirst({ where: { id: clientId, managerId: req.user.id }, select: { id: true } })))
+    if (clientId && !(await prisma.client.findFirst({ where: { id: clientId, ...(sup ? { managerId: { not: null } } : { managerId: req.user.id }) }, select: { id: true } })))
       throw new HttpError(400, "Unknown client");
     const saved = await prisma.user.update({
       where: { id },

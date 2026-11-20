@@ -8,7 +8,7 @@ import { useAuth } from "./auth";
 
 export default function NewProcess({ onClose, onCreated }) {
   const { user } = useAuth();
-  const mgr = user.role === "MANAGER";
+  const mgr = user.role === "MANAGER" || user.role === "SUPER_MANAGER";   // managers and super managers pick the assignee and can add clients
   const staff = user.role !== "CLIENT";          // managers and assignees choose the client
   const [meta, setMeta] = useState(null);
   const [f, setF] = useState({ title: "", description: "", priority: "MEDIUM", dueDate: "", clientId: "", assigneeId: "" });
