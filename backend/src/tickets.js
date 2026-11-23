@@ -17,7 +17,7 @@ const STATUSES = ["TODO", "IN_PROGRESS", "IN_REVIEW", "APPROVED"];
 
 // ---- visibility: the single place that decides who can see which ticket ----
 // A manager sees only the tickets of the clients they own (so manager 1 never sees manager 2's work).
-// An employee sees tickets assigned to them, plus any ticket where they were @mentioned in a comment.
+// A team member sees tickets assigned to them, plus any ticket where they were @mentioned in a comment.
 // A super manager sees every ticket of every client and manager, and can do everything a manager can.
 const scope = (u) =>
   u.role === "SUPER_MANAGER"
@@ -64,8 +64,8 @@ const find = async (u, key) => {
   return p;
 };
 
-// People who can be @mentioned on a ticket: the manager who owns its client, all employees, plus the users of
-// this ticket's own client. Never other managers or users of other clients. Mentioning an employee gives them access.
+// People who can be @mentioned on a ticket: the manager who owns its client, all team members, plus the users of
+// this ticket's own client. Never other managers or users of other clients. Mentioning a team member gives them access.
 const mentionable = async (p) => {
   const c = await prisma.client.findUnique({ where: { id: p.clientId }, select: { managerId: true } });
   return prisma.user.findMany({
@@ -99,11 +99,11 @@ processRouter.use((req, _res, next) =>
 processRouter.get(
   "/meta",
   h(async (req, res) => {
-    // Managers get their own clients and all employees. Employees get the clients (with the owning manager's name),
+    // Managers get their own clients and all team members. Team Members get the clients (with the owning manager's name),
     // so they can pick one when creating a ticket.
     if (req.user.role === "CLIENT") throw new HttpError(403, "Not available");
     const mgr = req.user.role === "MANAGER";
-    const sup = req.user.role === "SUPER_MANAGER";   // gets every manager's clients (with the owner's name) and all employees
+    const sup = req.user.role === "SUPER_MANAGER";   // gets every manager's clients (with the owner's name) and all team members
     if (mgr) await ensureInHouse(req.user.id);
     const [rows, assignees] = await Promise.all([
       prisma.client.findMany({
@@ -313,10 +313,10 @@ processRouter.post(
     // Clients create for their own client. Managers and assignees choose the client.
     const clientId = u.role === "CLIENT" ? u.clientId : b.clientId;
     if (!clientId) throw new HttpError(400, "Client is required");
-    // A manager can only use their own clients. An employee can use any client that has a manager.
+    // A manager can only use their own clients. A team member can use any client that has a manager.
     if (u.role === "MANAGER" && !(await prisma.client.findFirst({ where: { id: clientId, managerId: u.id }, select: { id: true } })))
       throw new HttpError(400, "Unknown client");
-    // Employees and super managers can use any client that has a manager.
+    // Team Members and super managers can use any client that has a manager.
     if ((u.role === "ASSIGNEE" || u.role === "SUPER_MANAGER") && !(await prisma.client.findFirst({ where: { id: clientId, managerId: { not: null } }, select: { id: true } })))
       throw new HttpError(400, "Unknown client");
     // Managers can assign anyone. A ticket created by an assignee is assigned to them, so it shows up on their board.
@@ -373,8 +373,8 @@ processRouter.patch(
   })
 );
 
-// Change the due date. Whoever can see the ticket may do it (creator, manager, employee, client),
-// except that an employee cannot touch an approved (locked) ticket. The change is written to the activity log.
+// Change the due date. Whoever can see the ticket may do it (creator, manager, team member, client),
+// except that a team member cannot touch an approved (locked) ticket. The change is written to the activity log.
 processRouter.put(
   "/tickets/:key/due-date",
   h(async (req, res) => {
@@ -411,7 +411,7 @@ processRouter.delete(
   })
 );
 
-// Edit the description of a ticket. Whoever can see the ticket may edit it, except that an employee
+// Edit the description of a ticket. Whoever can see the ticket may edit it, except that a team member
 // cannot touch an approved (locked) process. Each edit is written to the activity log. Anyone newly
 // @mentioned in the new text gets a notification, the same as when the ticket was created.
 processRouter.put(

@@ -10,7 +10,7 @@ export const PRIO = {
   MEDIUM: { label: "Medium", css: "med" },
   LOW: { label: "Low", css: "low" },
 };
-export const ROLE_LABEL = { SUPER_MANAGER: "Super Manager", MANAGER: "Manager", ASSIGNEE: "Employee", CLIENT: "Client" };
+export const ROLE_LABEL = { SUPER_MANAGER: "Super Manager", MANAGER: "Manager", ASSIGNEE: "Team Member", CLIENT: "Client" };
 
 export const fmt = (d) =>
   new Date(d).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
@@ -30,7 +30,7 @@ export function dueText(d, done) {
 export const initials = (n) => n.split(" ").map((x) => x[0]).join("").slice(0, 2).toUpperCase();
 
 export function scopeText(u) {
-  if (u.role === "SUPER_MANAGER") return { title: "All tickets", sub: "You can see and manage every ticket of every client, manager and employee. Create, edit, assign, approve and delete from any ticket." };
+  if (u.role === "SUPER_MANAGER") return { title: "All tickets", sub: "You can see and manage every ticket of every client, manager and team member. Create, edit, assign, approve and delete from any ticket." };
   if (u.role === "MANAGER") return { title: "All tickets", sub: "You can see every client’s tickets. Approve, reject and assign from each ticket." };
   if (u.role === "ASSIGNEE") return { title: "My assigned tickets", sub: "Tickets assigned to you, or where someone mentioned you, across clients." };
   return { title: `${u.client} tickets`, sub: `Private to ${u.client}. Tickets of other clients are never visible to you.` };

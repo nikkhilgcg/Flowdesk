@@ -3,7 +3,7 @@ import { z } from "zod";
 import { prisma } from "./db.js";
 import { h, HttpError, publicUser } from "./util.js";
 
-// Manager-only. A manager sees all employees, client users who are not linked to a client yet, and the client
+// Manager-only. A manager sees all team members, client users who are not linked to a client yet, and the client
 // users of their own clients. They never see other managers or other managers' client users.
 export const usersRouter = Router();
 
@@ -15,7 +15,7 @@ usersRouter.get(
   "/",
   h(async (req, res) => {
     const rows = await prisma.user.findMany({
-      // A super manager sees every employee and every client user.
+      // A super manager sees every team member and every client user.
       where: req.user.role === "SUPER_MANAGER"
         ? { role: { in: ["ASSIGNEE", "CLIENT"] } }
         : { OR: [{ role: "ASSIGNEE" }, { role: "CLIENT", clientId: null }, { role: "CLIENT", client: { managerId: req.user.id } }] },

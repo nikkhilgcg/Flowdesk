@@ -67,18 +67,18 @@ Only the web port (8080) is meant to be reachable by users.
 
 ## How access works
 
-- At `/register` people enter their full name and choose a role: **Employee** (`ASSIGNEE`), **Manager** or **Client**.
+- At `/register` people enter their full name and choose a role: **Team Member** (`ASSIGNEE`), **Manager** or **Client**.
   The role is stored on the `User` table. There is no role switcher in the UI. If someone picks the wrong role, fix or delete
   the user in the database (pgAdmin or Prisma Studio).
 - Login returns a JWT. Every request loads the user from the database, so changes apply immediately.
 - **Each client belongs to one manager** (`Client.managerId`, set to whoever creates it). `scope()` in `backend/src/tickets.js`
   is the only place that decides which tickets a user can see. A ticket outside your scope returns 404, never 403.
   - Manager: only tickets of their own clients. Manager 1 never sees manager 2's tickets.
-  - Employee: tickets assigned to them, or where they were @mentioned (across managers).
+  - Team Member: tickets assigned to them, or where they were @mentioned (across managers).
   - Client: tickets of their own client.
-- Managers use the People page to see employees and client users who are not linked to a client yet, and to link client users to
+- Managers use the People page to see team members and client users who are not linked to a client yet, and to link client users to
   one of their own clients. A client user who just registered sees "waiting for access" until a manager does this.
-- Everyone can create a ticket: managers (choose one of their clients, optionally an assignee), employees (choose a client; the ticket
+- Everyone can create a ticket: managers (choose one of their clients, optionally an assignee), team members (choose a client; the ticket
   is assigned to them so it appears on their board) and clients (always for their own client).
 - Managers add new clients with **+ Add a new client**, under the Client dropdown when creating a ticket or above the People table.
   Client names must be unique per manager (upper and lower case are treated as the same). Every manager also gets their own "In house" client.
@@ -90,8 +90,8 @@ Only the web port (8080) is meant to be reachable by users.
   (Not selected, Approve, Reject). It is only available while the ticket is In Review. Reject needs a written reason and counts as rework.
   Once a ticket is approved it is locked: only a manager or the client can reopen it.
   The rules are in the status route in `backend/src/tickets.js`.
-- Comments can @mention people. The list has all managers and employees, plus the users of that ticket's own client
-  (never users of other clients). Mentioning an employee gives them access to that ticket, so it appears on their board.
+- Comments can @mention people. The list has all managers and team members, plus the users of that ticket's own client
+  (never users of other clients). Mentioning a team member gives them access to that ticket, so it appears on their board.
 - Mentioning someone creates a notification for them. The bell in the navbar shows unread notifications
   ("Riya Mehta mentioned you in TKT-101"), and clicking one opens the ticket and marks it read.
   The home page has a Mentions tab listing every ticket where you were mentioned.
@@ -99,9 +99,9 @@ Only the web port (8080) is meant to be reachable by users.
 
 ## Registering real users
 
-- `/register` asks for full name, role (Employee, Manager or Client), email, password and confirm password (at least 8 characters).
+- `/register` asks for full name, role (Team Member, Manager or Client), email, password and confirm password (at least 8 characters).
   After signing up the person is signed in.
-- Employees and managers can start straight away. A **client** user sees a "waiting for access" page until a manager opens **People**
+- Team Members and managers can start straight away. A **client** user sees a "waiting for access" page until a manager opens **People**
   (a badge shows how many are waiting), picks one of their own clients for them, and clicks Save. The person clicks **Check again**
   or signs in again.
 - The role is chosen at sign-up and cannot be changed in the app. If someone picks the wrong one, fix or delete the user in the database
@@ -132,4 +132,4 @@ Only the web port (8080) is meant to be reachable by users.
 
 ## Due dates
 - A ticket can be created without a due date. It is then set from the priority: **High 2 days, Medium 4 days, Low 1 week** (default priority is Medium).
-- Anyone who can see a ticket can change its due date from the **Due** field on the ticket (an employee cannot change an approved, locked ticket). Each change is written to the activity log (`DUE_DATE` event).
+- Anyone who can see a ticket can change its due date from the **Due** field on the ticket (a team member cannot change an approved, locked ticket). Each change is written to the activity log (`DUE_DATE` event).

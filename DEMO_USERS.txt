@@ -10,7 +10,7 @@ MANAGERS  (each sees only the tickets of their own clients; add clients, assign,
   Riya Mehta          riya@flowdesk.test      clients: GT, Acme Corp        (TKT-101 to TKT-104, TKT-107)
   Karan Verma         karan@flowdesk.test     clients: Northwind, Zenith Labs (TKT-105, TKT-106, TKT-108)
 
-EMPLOYEES  (shared by both managers; see tickets assigned to them or where they were @mentioned)
+TEAM MEMBERS  (shared by both managers; see tickets assigned to them or where they were @mentioned)
   Arjun Rao           arjun@flowdesk.test     TKT-101 Quarterly filing preparation (GT, In Review)
                                               TKT-103 Annual compliance review (Acme Corp, To Do)
                                               TKT-108 Brand asset handover (Zenith Labs, In Progress)

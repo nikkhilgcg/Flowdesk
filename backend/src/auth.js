@@ -26,7 +26,7 @@ authRouter.post(
   })
 );
 
-// Sign up with name, email, password and a role (employee, manager or client). Employees and managers can start
+// Sign up with name, email, password and a role (team member, manager or client). Team Members and managers can start
 // straight away. A client user sees nothing until a manager links them to one of their clients (People page).
 const registerSchema = z
   .object({

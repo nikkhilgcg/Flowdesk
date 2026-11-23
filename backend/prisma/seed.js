@@ -37,7 +37,7 @@ async function main() {
   await client("In house", karan.id);
   const manager = { [gt.id]: riya, [acme.id]: riya, [nw.id]: karan, [zenith.id]: karan };
 
-  // Employees are shared: they can be assigned work by either manager.
+  // Team Members are shared: they can be assigned work by either manager.
   const arjun = await user("Arjun Rao", "arjun@flowdesk.test", "ASSIGNEE");
   const sana = await user("Sana Khan", "sana@flowdesk.test", "ASSIGNEE");
   const dev = await user("Dev Patel", "dev@flowdesk.test", "ASSIGNEE");

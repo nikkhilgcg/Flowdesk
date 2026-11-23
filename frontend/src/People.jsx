@@ -67,7 +67,7 @@ export default function People() {
       <h1>People</h1>
       <p className="sub">
         {waiting ? `${waiting} client ${waiting === 1 ? "user is" : "users are"} waiting to be added to a client. Choose one of your clients for them, then save.`
-          : "Employees, and the client users of your clients. Add a client below, then link client users to it."}
+          : "Team Members, and the client users of your clients. Add a client below, then link client users to it."}
       </p>
       <div className="addc-bar"><AddClient onAdded={(c) => setClients((l) => [...l, c].sort((a, b) => (a.name === "In house" ? -1 : b.name === "In house" ? 1 : a.name.localeCompare(b.name))))} /></div>
       <div className="tw">
