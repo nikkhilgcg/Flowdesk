@@ -351,7 +351,7 @@ export default function Ticket() {
               <input type="date" className="dateinp" aria-label="Due date" value={p.dueDate ? p.dueDate.slice(0, 10) : ""}
                 disabled={p.status === "APPROVED" && user.role === "ASSIGNEE"}
                 onChange={(e) => e.target.value && run(() => api(`/tickets/${p.key}/due-date`, { method: "PUT", body: { dueDate: e.target.value } }))} />
-              <div className="note due-note">{fdate(p.dueDate)}. Set automatically from the priority, change it any time.</div>
+            
             </dd>
             <dt>Created</dt><dd>{fmt(p.createdAt)}</dd>
             <dt>Rework</dt><dd>{p.reworkCount ? `${p.reworkCount} time${p.reworkCount > 1 ? "s" : ""}` : "None"}</dd>
