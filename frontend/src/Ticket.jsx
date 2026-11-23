@@ -8,12 +8,13 @@ import MentionField from "./MentionField";
 import { fdate, fmt, PRIO, ROLE_LABEL, SL, STATUSES } from "./lib";
 
 function eventText(e) {
-  if (e.type === "CREATED") return "created this process";
+  if (e.type === "CREATED") return "created this ticket";
   if (e.type === "ASSIGNED") return e.body ?? "changed the assignee";
   if (e.type === "DESCRIPTION") return "edited the description";
+  if (e.type === "DUE_DATE") return e.body ?? "changed the due date";
   if (e.type === "STATUS") {
-    if (e.fromStatus === "IN_REVIEW" && e.toStatus === "TODO") return "rejected this process and sent it back to To Do";
-    if (e.toStatus === "APPROVED") return "approved this process";
+    if (e.fromStatus === "IN_REVIEW" && e.toStatus === "TODO") return "rejected this ticket and sent it back to To Do";
+    if (e.toStatus === "APPROVED") return "approved this ticket";
     return `moved it from ${SL[e.fromStatus].label} to ${SL[e.toStatus].label}`;
   }
   return "";
@@ -32,7 +33,7 @@ function Body({ text, ids, people, meId }) {
   });
 }
 
-// Comment box: typing @ opens a list of people who can see this process.
+// Comment box: typing @ opens a list of people who can see this ticket.
 function CommentBox({ pkey, people, onSend }) {
   const [text, setText] = useState("");
   const [imgs, setImgs] = useState([]);       // images uploaded for this comment: { id, name }
@@ -73,7 +74,7 @@ function CommentBox({ pkey, people, onSend }) {
       if (bad) { setMsg(bad); continue; }
       setUploading((n) => n + 1);
       try {
-        const a = await uploadImage(`/processes/${pkey}/comment-images`, f);
+        const a = await uploadImage(`/tickets/${pkey}/comment-images`, f);
         setImgs((l) => [...l, { id: a.id, name: f.name || "Pasted image" }]);
       } catch (x) { setMsg(x.message); }
       setUploading((n) => n - 1);
@@ -155,7 +156,7 @@ export default function Ticket() {
   const pick = useRef(null);
 
   const load = useCallback(() => {
-    api(`/processes/${key}`).then((d) => { setP(d); setMissing(false); }).catch(() => setMissing(true));
+    api(`/tickets/${key}`).then((d) => { setP(d); setMissing(false); }).catch(() => setMissing(true));
   }, [key]);
   useEffect(() => { setRej(false); setEditing(false); setErr(""); load(); }, [load]);
   useEffect(() => { if (user.role === "MANAGER" || user.role === "SUPER_MANAGER") api("/meta").then(setMeta); }, [user]);
@@ -166,7 +167,7 @@ export default function Ticket() {
       const bad = imageProblem(f);
       if (bad) { setErr(bad); continue; }
       setAdding((n) => n + 1);
-      try { await uploadImage(`/processes/${key}/attachments`, f); load(); } catch (e) { setErr(e.message); }
+      try { await uploadImage(`/tickets/${key}/attachments`, f); load(); } catch (e) { setErr(e.message); }
       setAdding((n) => n - 1);
     }
   }, [key, load]);
@@ -185,18 +186,18 @@ export default function Ticket() {
     return (
       <main className="wrap"><div className="empty">
         <h1>Not found</h1>
-        <p className="sub">This process doesn’t exist or isn’t available to your account.</p>
+        <p className="sub">This ticket doesn’t exist or isn’t available to your account.</p>
         <Link className="btn" to="/">Back to board</Link>
       </div></main>
     );
   if (!p) return <main className="wrap"><div className="empty">Loading…</div></main>;
 
-  const mgr = user.role === "MANAGER" || user.role === "SUPER_MANAGER";   // a super manager can do everything a manager can, on every process
+  const mgr = user.role === "MANAGER" || user.role === "SUPER_MANAGER";   // a super manager can do everything a manager can, on every ticket
   const run = async (fn) => {
     setErr("");
     try { await fn(); load(); return true; } catch (e) { setErr(e.message); return false; }
   };
-  const move = (to, why) => run(() => api(`/processes/${p.key}/transition`, { method: "POST", body: { to, reason: why } }));
+  const move = (to, why) => run(() => api(`/tickets/${p.key}/transition`, { method: "POST", body: { to, reason: why } }));
   const pickStatus = (v) => {
     if (v === p.status) return;
     if (p.status === "IN_REVIEW" && v === "TODO") { setRej(true); return; }
@@ -213,7 +214,7 @@ export default function Ticket() {
 
   return (
     <main className="wrap">
-      <nav className="crumb"><Link to="/">Processes</Link> <span>/</span> {p.key}</nav>
+      <nav className="crumb"><Link to="/">Tickets</Link> <span>/</span> {p.key}</nav>
       <div className="dg">
         <div>
           <section className="pn">
@@ -227,7 +228,7 @@ export default function Ticket() {
                   <button className="btn" disabled={saving || draft.trim() === p.description}
                     onClick={async () => {
                       setSaving(true);
-                      const ok = await run(() => api(`/processes/${p.key}/description`, { method: "PUT", body: { description: draft } }));
+                      const ok = await run(() => api(`/tickets/${p.key}/description`, { method: "PUT", body: { description: draft } }));
                       setSaving(false);
                       if (ok) setEditing(false);
                     }}>{saving ? "Saving…" : "Save changes"}</button>
@@ -278,7 +279,7 @@ export default function Ticket() {
                 <Dropdown id="dc" value={decision} disabled={p.status !== "IN_REVIEW" && p.status !== "APPROVED"} onChange={pickDecision}
                   options={[{ value: "NONE", label: "Not selected" }, { value: "APPROVE", label: "Approve", disabled: p.status === "APPROVED" }, { value: "REJECT", label: "Reject", disabled: p.status === "APPROVED" }]} />
                 {p.status === "APPROVED" ? <span className="note">Approved. Change the status on the right to reopen it.</span>
-                  : p.status !== "IN_REVIEW" && <span className="note">Available when the process is In Review.</span>}
+                  : p.status !== "IN_REVIEW" && <span className="note">Available when the ticket is In Review.</span>}
               </div>
             )}
             {rej && (
@@ -296,12 +297,12 @@ export default function Ticket() {
 
           <section className="pn">
             <h3>Activity</h3>
-            {<CommentBox pkey={p.key} people={p.people} onSend={(body, attachmentIds) => run(() => api(`/processes/${p.key}/comments`, { method: "POST", body: { body, attachmentIds } }))} />}
+            {<CommentBox pkey={p.key} people={p.people} onSend={(body, attachmentIds) => run(() => api(`/tickets/${p.key}/comments`, { method: "POST", body: { body, attachmentIds } }))} />}
             <div className="tl">
               {[...p.events].reverse().map((e) => (
                 <div className={`ev ${e.type === "COMMENT" ? "c" : ""}`} key={e.id}>
                   <b>{e.actor.name}</b> {e.type === "COMMENT" ? "commented" : eventText(e)} <small>· {fmt(e.createdAt)}</small>
-                  {e.body && e.type !== "ASSIGNED" && e.type !== "DESCRIPTION" && (
+                  {e.body && e.type !== "ASSIGNED" && e.type !== "DESCRIPTION" && e.type !== "DUE_DATE" && (
                     <div className="bx">
                       {e.type === "STATUS" ? `Reason: ${e.body}` : <Body text={e.body} ids={e.mentions} people={p.people} meId={user.id} />}
                     </div>
@@ -342,10 +343,16 @@ export default function Ticket() {
             <dt>Assignee</dt>
             <dd>{mgr ? (
               <Dropdown ariaLabel="Assignee" value={p.assignee?.id ?? ""} placeholder="Unassigned"
-                onChange={(v) => run(() => api(`/processes/${p.key}`, { method: "PATCH", body: { assigneeId: v ? Number(v) : null } }))}
+                onChange={(v) => run(() => api(`/tickets/${p.key}`, { method: "PATCH", body: { assigneeId: v ? Number(v) : null } }))}
                 options={[{ value: "", label: "Unassigned" }, ...(meta?.assignees ?? []).map((a) => ({ value: a.id, label: a.name, person: true }))]} />) : (p.assignee?.name ?? "Unassigned")}</dd>
             <dt>Priority</dt><dd><span className={`pc ${PRIO[p.priority].css}`}><i />{PRIO[p.priority].label}</span></dd>
-            <dt>Due</dt><dd>{fdate(p.dueDate)}</dd>
+            <dt>Due</dt>
+            <dd>
+              <input type="date" className="dateinp" aria-label="Due date" value={p.dueDate ? p.dueDate.slice(0, 10) : ""}
+                disabled={p.status === "APPROVED" && user.role === "ASSIGNEE"}
+                onChange={(e) => e.target.value && run(() => api(`/tickets/${p.key}/due-date`, { method: "PUT", body: { dueDate: e.target.value } }))} />
+              <div className="note due-note">{fdate(p.dueDate)}. Set automatically from the priority, change it any time.</div>
+            </dd>
             <dt>Created</dt><dd>{fmt(p.createdAt)}</dd>
             <dt>Rework</dt><dd>{p.reworkCount ? `${p.reworkCount} time${p.reworkCount > 1 ? "s" : ""}` : "None"}</dd>
             <dt>Last status change by</dt><dd>{p.statusBy ?? "—"}</dd>
@@ -353,12 +360,15 @@ export default function Ticket() {
           {p.canDelete && (
             <div style={{ marginTop: 16 }}>
               {!confirmDel ? (
-                <button className="lnk" onClick={() => { setErr(""); setConfirmDel(true); }}>Delete process</button>
+                <button className="btn danger delbtn" onClick={() => { setErr(""); setConfirmDel(true); }}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6" /></svg>
+                  Delete ticket
+                </button>
               ) : (
-                <div className="rejbox">
+                <div className="delbox">
                   <p>Delete {p.key} for good? Its comments, activity and images will be removed too.</p>
                   <div className="acts">
-                    <button className="btn er" onClick={async () => { if (await run(async () => { await api(`/processes/${p.key}`, { method: "DELETE" }); nav("/"); })) setConfirmDel(false); }}>Yes, delete</button>
+                    <button className="btn danger" onClick={async () => { if (await run(async () => { await api(`/tickets/${p.key}`, { method: "DELETE" }); nav("/"); })) setConfirmDel(false); }}>Yes, delete ticket</button>
                     <button className="btn g" onClick={() => setConfirmDel(false)}>Cancel</button>
                   </div>
                 </div>

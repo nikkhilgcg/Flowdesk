@@ -6,12 +6,19 @@ import { h, HttpError, isPending, publicUser } from "./util.js";
 export const processRouter = Router();
 
 const PRIORITIES = ["HIGH", "MEDIUM", "LOW"];
+
+// When nobody picks a due date, it is set from the priority: High 2 days, Medium 4 days, Low 1 week.
+const DEFAULT_DUE_DAYS = { HIGH: 2, MEDIUM: 4, LOW: 7 };
+const defaultDue = (priority) => {
+  const n = new Date();
+  return new Date(Date.UTC(n.getUTCFullYear(), n.getUTCMonth(), n.getUTCDate() + DEFAULT_DUE_DAYS[priority]));
+};
 const STATUSES = ["TODO", "IN_PROGRESS", "IN_REVIEW", "APPROVED"];
 
-// ---- visibility: the single place that decides who can see which process ----
-// A manager sees only the processes of the clients they own (so manager 1 never sees manager 2's work).
-// An employee sees processes assigned to them, plus any process where they were @mentioned in a comment.
-// A super manager sees every process of every client and manager, and can do everything a manager can.
+// ---- visibility: the single place that decides who can see which ticket ----
+// A manager sees only the tickets of the clients they own (so manager 1 never sees manager 2's work).
+// An employee sees tickets assigned to them, plus any ticket where they were @mentioned in a comment.
+// A super manager sees every ticket of every client and manager, and can do everything a manager can.
 const scope = (u) =>
   u.role === "SUPER_MANAGER"
     ? {}
@@ -27,11 +34,11 @@ const isManager = (u) => u.role === "MANAGER" || u.role === "SUPER_MANAGER";
 // Shown wherever the person behind a comment, status change or image has been deleted from the database.
 const DELETED_USER = "Deleted user";
 
-// ---- ids look like PRC-101 (database id + 100) ----
+// ---- ids look like TKT-101 (database id + 100) ----
 const OFFSET = 100;
-const keyOf = (id) => `PRC-${id + OFFSET}`;
+const keyOf = (id) => `TKT-${id + OFFSET}`;
 const idOf = (k) => {
-  const m = /^PRC-(\d+)$/.exec(k);
+  const m = /^TKT-(\d+)$/.exec(k);
   return m ? Number(m[1]) - OFFSET : NaN;
 };
 
@@ -49,16 +56,16 @@ const dto = (p) => ({
   assignee: p.assignee,
 });
 
-// A process outside the caller's scope is reported as not found, never as forbidden.
+// A ticket outside the caller's scope is reported as not found, never as forbidden.
 const find = async (u, key) => {
   const id = idOf(key);
   const p = Number.isInteger(id) ? await prisma.process.findFirst({ where: { id, ...scope(u) }, include }) : null;
-  if (!p) throw new HttpError(404, "Process not found");
+  if (!p) throw new HttpError(404, "Ticket not found");
   return p;
 };
 
-// People who can be @mentioned on a process: the manager who owns its client, all employees, plus the users of
-// this process's own client. Never other managers or users of other clients. Mentioning an employee gives them access.
+// People who can be @mentioned on a ticket: the manager who owns its client, all employees, plus the users of
+// this ticket's own client. Never other managers or users of other clients. Mentioning an employee gives them access.
 const mentionable = async (p) => {
   const c = await prisma.client.findUnique({ where: { id: p.clientId }, select: { managerId: true } });
   return prisma.user.findMany({
@@ -87,13 +94,13 @@ processRouter.use((req, _res, next) =>
   isPending(req.user) ? next(new HttpError(403, "Your account is waiting for a manager to give you access")) : next()
 );
 
-// A super manager is allowed to do everything: see, create, edit, assign, approve and delete any process.
+// A super manager is allowed to do everything: see, create, edit, assign, approve and delete any ticket.
 
 processRouter.get(
   "/meta",
   h(async (req, res) => {
     // Managers get their own clients and all employees. Employees get the clients (with the owning manager's name),
-    // so they can pick one when creating a process.
+    // so they can pick one when creating a ticket.
     if (req.user.role === "CLIENT") throw new HttpError(403, "Not available");
     const mgr = req.user.role === "MANAGER";
     const sup = req.user.role === "SUPER_MANAGER";   // gets every manager's clients (with the owner's name) and all employees
@@ -111,7 +118,7 @@ processRouter.get(
   })
 );
 
-// Who can be @mentioned while writing a new process: all staff plus the users of the chosen client.
+// Who can be @mentioned while writing a new ticket: all staff plus the users of the chosen client.
 processRouter.get(
   "/mentionable",
   h(async (req, res) => {
@@ -144,10 +151,10 @@ processRouter.post(
 );
 
 processRouter.get(
-  "/processes",
+  "/tickets",
   h(async (req, res) => {
     const rows = await prisma.process.findMany({ where: scope(req.user), include, orderBy: { createdAt: "desc" } });
-    // The latest comment that mentioned this user, per process (for the Mentions tab).
+    // The latest comment that mentioned this user, per ticket (for the Mentions tab).
     const mentions = await prisma.processEvent.findMany({
       where: { mentions: { has: req.user.id }, processId: { in: rows.map((r) => r.id) } },
       orderBy: { createdAt: "desc" },
@@ -161,7 +168,7 @@ processRouter.get(
 );
 
 processRouter.get(
-  "/processes/:key",
+  "/tickets/:key",
   h(async (req, res) => {
     const p = await find(req.user, req.params.key);
     const events = await prisma.processEvent.findMany({
@@ -169,7 +176,7 @@ processRouter.get(
       orderBy: { createdAt: "asc" },
       include: { actor: { select: { name: true } } },
     });
-    const last = [...events].reverse().find((e) => e.type !== "COMMENT" && e.type !== "ASSIGNED" && e.type !== "DESCRIPTION");
+    const last = [...events].reverse().find((e) => e.type === "CREATED" || e.type === "STATUS");
     const createdBy = events.find((e) => e.type === "CREATED")?.actorId ?? null;
     const all = await prisma.attachment.findMany({
       where: { processId: p.id, OR: [{ inComment: false }, { eventId: { not: null } }] },
@@ -181,7 +188,7 @@ processRouter.get(
     res.json({
       ...dto(p),
       statusBy: last ? (last.actor?.name ?? DELETED_USER) : null,
-      // Whoever created it, the manager who owns its client, and any super manager can delete a process.
+      // Whoever created it, the manager who owns its client, and any super manager can delete a ticket.
       canDelete: req.user.role === "SUPER_MANAGER" || (req.user.role === "MANAGER" && p.client.managerId === req.user.id) || createdBy === req.user.id,
       events: events.map((e) => ({ ...e, actor: { name: e.actor?.name ?? DELETED_USER }, attachments: byEvent.get(e.id) ?? [] })),
       people: await mentionable(p),
@@ -234,15 +241,15 @@ processRouter.post(
 
 // Added to a ticket that already exists.
 processRouter.post(
-  "/processes/:key/attachments",
+  "/tickets/:key/attachments",
   imageBody,
   h(async (req, res) => {
     const u = req.user;
     const p = await find(u, req.params.key);
-    if (p.status === "APPROVED" && u.role === "ASSIGNEE") throw new HttpError(403, "This process is approved and locked");
+    if (p.status === "APPROVED" && u.role === "ASSIGNEE") throw new HttpError(403, "This ticket is approved and locked");
     const img = readImage(req);
     if ((await prisma.attachment.count({ where: { processId: p.id, inComment: false } })) >= MAX_PER_PROCESS)
-      throw new HttpError(400, `A process can have up to ${MAX_PER_PROCESS} images`);
+      throw new HttpError(400, `A ticket can have up to ${MAX_PER_PROCESS} images`);
     const a = await prisma.attachment.create({ data: { ...img, uploaderId: u.id, processId: p.id }, select: attMeta });
     res.status(201).json(attDto(a));
   })
@@ -251,7 +258,7 @@ processRouter.post(
 // Image for a comment that is being written. Stays a draft until the comment is posted.
 const MAX_PER_COMMENT = 5;
 processRouter.post(
-  "/processes/:key/comment-images",
+  "/tickets/:key/comment-images",
   imageBody,
   h(async (req, res) => {
     const u = req.user;
@@ -299,7 +306,7 @@ const createSchema = z.object({
 });
 
 processRouter.post(
-  "/processes",
+  "/tickets",
   h(async (req, res) => {
     const u = req.user;
     const b = createSchema.parse(req.body);
@@ -312,7 +319,7 @@ processRouter.post(
     // Employees and super managers can use any client that has a manager.
     if ((u.role === "ASSIGNEE" || u.role === "SUPER_MANAGER") && !(await prisma.client.findFirst({ where: { id: clientId, managerId: { not: null } }, select: { id: true } })))
       throw new HttpError(400, "Unknown client");
-    // Managers can assign anyone. A process created by an assignee is assigned to them, so it shows up on their board.
+    // Managers can assign anyone. A ticket created by an assignee is assigned to them, so it shows up on their board.
     let assigneeId = u.role === "ASSIGNEE" ? u.id : null;
     if (isManager(u) && b.assigneeId) {
       const a = await prisma.user.findFirst({ where: { id: b.assigneeId, role: "ASSIGNEE" } });
@@ -327,7 +334,7 @@ processRouter.post(
           title: b.title,
           description: b.description,
           priority: b.priority,
-          dueDate: b.dueDate ? new Date(b.dueDate) : null,
+          dueDate: b.dueDate ? new Date(b.dueDate) : defaultDue(b.priority),
           clientId,
           assigneeId,
           events: { create: { actorId: u.id, type: "CREATED", mentions: ids } },
@@ -348,7 +355,7 @@ processRouter.post(
 );
 
 processRouter.patch(
-  "/processes/:key",
+  "/tickets/:key",
   h(async (req, res) => {
     const u = req.user;
     if (!isManager(u)) throw new HttpError(403, "Managers only");
@@ -366,31 +373,54 @@ processRouter.patch(
   })
 );
 
-// Delete a process with its comments, activity, images and notifications (they cascade in the database).
+// Change the due date. Whoever can see the ticket may do it (creator, manager, employee, client),
+// except that an employee cannot touch an approved (locked) ticket. The change is written to the activity log.
+processRouter.put(
+  "/tickets/:key/due-date",
+  h(async (req, res) => {
+    const u = req.user;
+    const { dueDate } = z.object({ dueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Pick a valid date") }).parse(req.body);
+    const p = await find(u, req.params.key);
+    if (p.status === "APPROVED" && u.role === "ASSIGNEE") throw new HttpError(403, "This ticket is approved and locked");
+    const next = new Date(dueDate);
+    if (Number.isNaN(next.getTime())) throw new HttpError(400, "Pick a valid date");
+    if (p.dueDate && p.dueDate.getTime() === next.getTime()) throw new HttpError(400, "Nothing was changed");
+    const day = (d) => (d ? d.toISOString().slice(0, 10) : "none");
+    const [updated] = await prisma.$transaction([
+      prisma.process.update({ where: { id: p.id }, data: { dueDate: next }, include }),
+      prisma.processEvent.create({
+        data: { processId: p.id, actorId: u.id, type: "DUE_DATE", body: `changed the due date from ${day(p.dueDate)} to ${day(next)}` },
+      }),
+    ]);
+    res.json(dto(updated));
+  })
+);
+
+// Delete a ticket with its comments, activity, images and notifications (they cascade in the database).
 // Allowed for whoever created it, the manager who owns its client, and super managers.
 processRouter.delete(
-  "/processes/:key",
+  "/tickets/:key",
   h(async (req, res) => {
     const u = req.user;
     const p = await find(u, req.params.key);
     const first = await prisma.processEvent.findFirst({ where: { processId: p.id, type: "CREATED" }, orderBy: { id: "asc" }, select: { actorId: true } });
     const ok = u.role === "SUPER_MANAGER" || (u.role === "MANAGER" && p.client.managerId === u.id) || first?.actorId === u.id;
-    if (!ok) throw new HttpError(403, "Only the person who created this process, its manager or a super manager can delete it");
+    if (!ok) throw new HttpError(403, "Only the person who created this ticket, its manager or a super manager can delete it");
     await prisma.process.delete({ where: { id: p.id } });
     res.json({ ok: true });
   })
 );
 
-// Edit the description of a process. Whoever can see the process may edit it, except that an employee
+// Edit the description of a ticket. Whoever can see the ticket may edit it, except that an employee
 // cannot touch an approved (locked) process. Each edit is written to the activity log. Anyone newly
-// @mentioned in the new text gets a notification, the same as when the process was created.
+// @mentioned in the new text gets a notification, the same as when the ticket was created.
 processRouter.put(
-  "/processes/:key/description",
+  "/tickets/:key/description",
   h(async (req, res) => {
     const u = req.user;
     const { description } = z.object({ description: z.string().trim().max(5000) }).parse(req.body);
     const p = await find(u, req.params.key);
-    if (p.status === "APPROVED" && u.role === "ASSIGNEE") throw new HttpError(403, "This process is approved and locked");
+    if (p.status === "APPROVED" && u.role === "ASSIGNEE") throw new HttpError(403, "This ticket is approved and locked");
     if (description === p.description) throw new HttpError(400, "Nothing was changed");
     const people = await mentionable(p);
     const earlier = await prisma.processEvent.findMany({ where: { processId: p.id }, select: { mentions: true } });
@@ -412,25 +442,25 @@ processRouter.put(
 );
 
 // ---- status changes ----
-// Anyone who can see a process can move it between To Do, In Progress and In Review.
+// Anyone who can see a ticket can move it between To Do, In Progress and In Review.
 // Approving, and rejecting (sending it back from In Review to To Do with a reason), is a decision
 // that only a manager or the client can make. Rejection counts as rework.
-// Once approved, a process is locked: only a manager or the client can reopen it.
+// Once approved, a ticket is locked: only a manager or the client can reopen it.
 processRouter.post(
-  "/processes/:key/transition",
+  "/tickets/:key/transition",
   h(async (req, res) => {
     const u = req.user;
     const { to, reason } = z
       .object({ to: z.enum(STATUSES), reason: z.string().trim().max(2000).optional() })
       .parse(req.body);
     const p = await find(u, req.params.key);
-    if (p.status === to) throw new HttpError(400, "The process is already in that status");
+    if (p.status === to) throw new HttpError(400, "The ticket is already in that status");
     const approve = to === "APPROVED";
     const reject = p.status === "IN_REVIEW" && to === "TODO";
     const decider = isManager(u) || u.role === "CLIENT";
     if ((approve || reject) && !decider) throw new HttpError(403, "Only a manager or the client can approve or reject");
-    if (p.status === "APPROVED" && !decider) throw new HttpError(403, "This process is approved and locked. Only a manager or the client can reopen it");
-    if (approve && p.status !== "IN_REVIEW") throw new HttpError(400, "Only a process in review can be approved");
+    if (p.status === "APPROVED" && !decider) throw new HttpError(403, "This ticket is approved and locked. Only a manager or the client can reopen it");
+    if (approve && p.status !== "IN_REVIEW") throw new HttpError(400, "Only a ticket in review can be approved");
     if (reject && !reason) throw new HttpError(400, "A reason is required to reject");
     await prisma.$transaction(async (tx) => {
       // updateMany with the old status guards against two people acting at once
@@ -448,7 +478,7 @@ processRouter.post(
 );
 
 processRouter.post(
-  "/processes/:key/comments",
+  "/tickets/:key/comments",
   h(async (req, res) => {
     const u = req.user;
     const { body, attachmentIds } = z
@@ -466,7 +496,7 @@ processRouter.post(
         include: { actor: { select: { name: true } } },
       });
       if (attachmentIds.length) {
-        // Only this person's own draft images on this process can be attached.
+        // Only this person's own draft images on this ticket can be attached.
         const r = await tx.attachment.updateMany({
           where: { id: { in: attachmentIds }, uploaderId: u.id, processId: p.id, inComment: true, eventId: null },
           data: { eventId: ev.id },

@@ -46,7 +46,7 @@ async function main() {
   await user("Northwind Portal User", "northwind@client.test", "CLIENT", nw.id);
   await user("Zenith Portal User", "zenith@client.test", "CLIENT", zenith.id);
 
-  // Created in order on a fresh table, so they become PRC-101 ... PRC-107
+  // Created in order on a fresh table, so they become TKT-101 ... TKT-107
   const rows = [
     ["Quarterly filing preparation", "Collect ledgers and prepare the filing pack for GT.", gt.id, arjun.id, "IN_REVIEW", "HIGH", "2026-11-20", 0],
     ["Vendor onboarding checklist", "Verify vendor documents and complete the onboarding checklist.", gt.id, sana.id, "IN_PROGRESS", "MEDIUM", "2026-11-25", 1],

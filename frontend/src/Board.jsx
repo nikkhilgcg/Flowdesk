@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api } from "./api";
 import { useAuth } from "./auth";
-import NewProcess from "./NewProcess";
+import NewTicket from "./NewTicket";
 import AddClient from "./AddClient";
 import { dueText, fdate, fmt, PRIO, SL, STATUSES } from "./lib";
 
@@ -20,7 +20,7 @@ export default function Board() {
   const [toast, setToast] = useState("");
   const [err, setErr] = useState("");
 
-  useEffect(() => { api("/processes").then(setItems).catch((e) => setErr(e.message)); }, []);
+  useEffect(() => { api("/tickets").then(setItems).catch((e) => setErr(e.message)); }, []);
   const L = useMemo(
     () => (items || []).filter((p) => (p.key + p.title + p.client.name + (p.client.owner ?? "") + (p.assignee?.name ?? "")).toLowerCase().includes(q.toLowerCase())),
     [items, q]
@@ -38,7 +38,7 @@ export default function Board() {
   return (
     <main className="wrap">
       <div className="tabs" role="tablist">
-        <button role="tab" aria-selected={tab === "all"} className={tab === "all" ? "on" : ""} onClick={() => setTab("all")}>All processes</button>
+        <button role="tab" aria-selected={tab === "all"} className={tab === "all" ? "on" : ""} onClick={() => setTab("all")}>All tickets</button>
         <button role="tab" aria-selected={tab === "mentions"} className={tab === "mentions" ? "on" : ""} onClick={() => setTab("mentions")}>
           Mentions{mentionTotal > 0 && <span className="tn">{mentionTotal}</span>}
         </button>
@@ -47,22 +47,22 @@ export default function Board() {
       {tab === "all" && (
         <div className="stats">
           {STATUSES.map((s) => (
-            <div className="stat" key={s.key}><b>{count(s.key)}</b><span>{s.label}</span></div>
+            <div className={`stat ${s.css}`} key={s.key}><b>{count(s.key)}</b><span>{s.label}</span></div>
           ))}
         </div>
       )}
 
       <div className="bar">
-        <input className="search" aria-label="Search processes" placeholder="Search by ID, title, client or assignee" value={q} onChange={(e) => setQ(e.target.value)} />
         {tab === "all" && (
           <div className="seg" role="group" aria-label="View">
             <button className={view === "board" ? "on" : ""} onClick={() => setView("board")}>Board</button>
             <button className={view === "list" ? "on" : ""} onClick={() => setView("list")}>List</button>
           </div>
         )}
+        <input className="search" aria-label="Search tickets" placeholder="Search by ID, title, client or assignee" value={q} onChange={(e) => setQ(e.target.value)} />
         <span className="sp" />
         {(user.role === "MANAGER" || sup) && <button className="btn g" onClick={() => setAddingClient(true)}>+ Add client</button>}
-        <button className="btn" onClick={() => setOpen(true)}>+ New process</button>
+        <button className="btn" onClick={() => setOpen(true)}>+ New ticket</button>
       </div>
 
       {tab === "mentions" ? (
@@ -83,7 +83,7 @@ export default function Board() {
       ) : view === "board" ? (
         <div className="board">
           {STATUSES.map((s) => (
-            <section className="col" key={s.key}>
+            <section className={`col ${s.css}`} key={s.key}>
               <div className="ch"><span>{s.label}</span><span className="n">{count(s.key)}</span></div>
               {L.filter((p) => p.status === s.key).map((p) => (
                 <Link className="card" to={`/${p.key}`} key={p.key}>
@@ -123,7 +123,7 @@ export default function Board() {
                   <td><span className={`st ${SL[p.status].css}`}>{SL[p.status].label}</span></td>
                 </tr>
               ))}
-              {L.length === 0 && <tr><td colSpan={7} className="empty">No processes</td></tr>}
+              {L.length === 0 && <tr><td colSpan={7} className="empty">No tickets</td></tr>}
             </tbody>
           </table>
         </div>
@@ -133,12 +133,12 @@ export default function Board() {
         <div className="ov" onClick={(e) => e.target === e.currentTarget && setAddingClient(false)} onKeyDown={(e) => e.key === "Escape" && setAddingClient(false)}>
           <div className="md sm" role="dialog" aria-modal="true" aria-label="Add client">
             <h2>Add client</h2>
-            <p className="hint" style={{ marginTop: 0 }}>The client appears in the client list when creating a process, and on the People page.</p>
+            <p className="hint" style={{ marginTop: 0 }}>The client appears in the client list when creating a ticket, and on the People page.</p>
             <AddClient startOpen onAdded={(c) => { setAddingClient(false); setToast(`Client “${c.name}” added`); setTimeout(() => setToast(""), 4000); }} onCancel={() => setAddingClient(false)} />
           </div>
         </div>
       )}
-      {open && <NewProcess onClose={() => setOpen(false)} onCreated={(key) => nav(`/${key}`)} />}
+      {open && <NewTicket onClose={() => setOpen(false)} onCreated={(key) => nav(`/${key}`)} />}
     </main>
   );
 }

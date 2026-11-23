@@ -6,28 +6,28 @@ These accounts are created by `npm run seed` (or automatically by Docker when
 SEED_DEMO=true and the database is empty). Demo data only. Delete these users and
 never use these passwords once real people are added.
 
-MANAGERS  (each sees only the processes of their own clients; add clients, assign, approve and reject)
-  Riya Mehta          riya@flowdesk.test      clients: GT, Acme Corp        (PRC-101 to PRC-104, PRC-107)
-  Karan Verma         karan@flowdesk.test     clients: Northwind, Zenith Labs (PRC-105, PRC-106, PRC-108)
+MANAGERS  (each sees only the tickets of their own clients; add clients, assign, approve and reject)
+  Riya Mehta          riya@flowdesk.test      clients: GT, Acme Corp        (TKT-101 to TKT-104, TKT-107)
+  Karan Verma         karan@flowdesk.test     clients: Northwind, Zenith Labs (TKT-105, TKT-106, TKT-108)
 
-EMPLOYEES  (shared by both managers; see processes assigned to them or where they were @mentioned)
-  Arjun Rao           arjun@flowdesk.test     PRC-101 Quarterly filing preparation (GT, In Review)
-                                              PRC-103 Annual compliance review (Acme Corp, To Do)
-                                              PRC-108 Brand asset handover (Zenith Labs, In Progress)
-  Sana Khan           sana@flowdesk.test      PRC-102 Vendor onboarding checklist (GT, In Progress)
-                                              PRC-105 Policy document refresh (Northwind, Approved)
-  Dev Patel           dev@flowdesk.test       PRC-104 Invoice reconciliation (Acme Corp, In Progress)
-                                              PRC-106 Audit evidence collection (Northwind, In Review)
-                                              PRC-107 Contract renewal workflow (GT, To Do)
+EMPLOYEES  (shared by both managers; see tickets assigned to them or where they were @mentioned)
+  Arjun Rao           arjun@flowdesk.test     TKT-101 Quarterly filing preparation (GT, In Review)
+                                              TKT-103 Annual compliance review (Acme Corp, To Do)
+                                              TKT-108 Brand asset handover (Zenith Labs, In Progress)
+  Sana Khan           sana@flowdesk.test      TKT-102 Vendor onboarding checklist (GT, In Progress)
+                                              TKT-105 Policy document refresh (Northwind, Approved)
+  Dev Patel           dev@flowdesk.test       TKT-104 Invoice reconciliation (Acme Corp, In Progress)
+                                              TKT-106 Audit evidence collection (Northwind, In Review)
+                                              TKT-107 Contract renewal workflow (GT, To Do)
 
-CLIENTS  (portal users; see only their own company's processes)
+CLIENTS  (portal users; see only their own company's tickets)
   GT Portal User         gt@client.test          client: GT
   Acme Portal User       acme@client.test        client: Acme Corp
   Northwind Portal User  northwind@client.test   client: Northwind
   Zenith Portal User     zenith@client.test      client: Zenith Labs
 
 THINGS WORTH TRYING
-  - Log in as riya@flowdesk.test: you see 5 processes. Open /PRC-105 in the address bar: "Not found" (it is Karan's).
-  - Log in as karan@flowdesk.test: you see PRC-105, PRC-106 and PRC-108 only, and People lists only Zenith/Northwind client users.
+  - Log in as riya@flowdesk.test: you see 5 tickets. Open /TKT-105 in the address bar: "Not found" (it is Karan's).
+  - Log in as karan@flowdesk.test: you see TKT-105, TKT-106 and TKT-108 only, and People lists only Zenith/Northwind client users.
   - Register a new account as Client: it shows "waiting for access" until a manager links it to one of their clients on People.
-  - Log in as gt@client.test, then open /PRC-103 in the address bar: "Not found" (it belongs to Acme).
+  - Log in as gt@client.test, then open /TKT-103 in the address bar: "Not found" (it belongs to Acme).

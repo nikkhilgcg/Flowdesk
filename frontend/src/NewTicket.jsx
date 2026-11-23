@@ -5,8 +5,9 @@ import AddClient from "./AddClient";
 import Dropdown from "./Dropdown";
 import MentionField from "./MentionField";
 import { useAuth } from "./auth";
+import { defaultDueInfo } from "./lib";
 
-export default function NewProcess({ onClose, onCreated }) {
+export default function NewTicket({ onClose, onCreated }) {
   const { user } = useAuth();
   const mgr = user.role === "MANAGER" || user.role === "SUPER_MANAGER";   // managers and super managers pick the assignee and can add clients
   const staff = user.role !== "CLIENT";          // managers and assignees choose the client
@@ -20,6 +21,7 @@ export default function NewProcess({ onClose, onCreated }) {
   const pick = useRef(null);
   const [people, setPeople] = useState([]);       // who can be @mentioned in the description
   const set = (k, v) => setF((s) => ({ ...s, [k]: v }));
+  const autoDue = defaultDueInfo(f.priority);   // what the due date becomes if it is left empty
 
   useEffect(() => {
     if (staff) api("/meta").then((m) => { setMeta(m); setF((s) => ({ ...s, clientId: String(m.clients[0]?.id ?? "") })); });
@@ -36,7 +38,7 @@ export default function NewProcess({ onClose, onCreated }) {
     for (const f of files) {
       const bad = imageProblem(f);
       if (bad) { setErr(bad); continue; }
-      if (imgs.length + uploading >= 10) { setErr("A process can have up to 10 images"); break; }
+      if (imgs.length + uploading >= 10) { setErr("A ticket can have up to 10 images"); break; }
       setUploading((n) => n + 1);
       try {
         const a = await uploadImage("/attachments", f);
@@ -61,7 +63,7 @@ export default function NewProcess({ onClose, onCreated }) {
     if (!f.title.trim()) { setErr("Title is required"); return; }
     setBusy(true); setErr("");
     try {
-      const p = await api("/processes", {
+      const p = await api("/tickets", {
         method: "POST",
         body: {
           title: f.title, description: f.description, priority: f.priority, dueDate: f.dueDate, attachmentIds: imgs.map((x) => x.id),
@@ -75,8 +77,8 @@ export default function NewProcess({ onClose, onCreated }) {
 
   return (
     <div className="ov" onClick={(e) => e.target === e.currentTarget && cancel()}>
-      <div className="md" role="dialog" aria-modal="true" aria-label="New process">
-        <h2>New process</h2>
+      <div className="md" role="dialog" aria-modal="true" aria-label="New ticket">
+        <h2>New ticket</h2>
         <label htmlFor="c">Client</label>
         {staff ? (
           <Dropdown id="c" value={f.clientId} onChange={(v) => set("clientId", v)} placeholder="Loading…"
@@ -123,8 +125,9 @@ export default function NewProcess({ onClose, onCreated }) {
               options={[{ value: "HIGH", label: "High" }, { value: "MEDIUM", label: "Medium" }, { value: "LOW", label: "Low" }]} />
           </div>
           <div>
-            <label htmlFor="du">Due date</label>
+            <label htmlFor="du">Due date <span className="opt">(optional)</span></label>
             <input id="du" type="date" value={f.dueDate} onChange={(e) => set("dueDate", e.target.value)} />
+            {!f.dueDate && <div className="fh">Not set: it will be due {autoDue.text}.</div>}
           </div>
         </div>
         {mgr && (
@@ -134,11 +137,11 @@ export default function NewProcess({ onClose, onCreated }) {
               options={[{ value: "", label: "Unassigned" }, ...(meta?.assignees ?? []).map((a) => ({ value: a.id, label: a.name, person: true }))]} />
           </>
         )}
-        <p className="hint">The ID and created time are generated automatically.{user.role === "ASSIGNEE" && " The process is assigned to you."}</p>
+        <p className="hint">The ID and created time are generated automatically. You can change the due date later from the ticket.{user.role === "ASSIGNEE" && " The ticket is assigned to you."}</p>
         {err && <div className="err" role="alert">{err}</div>}
         <div className="acts end">
           <button className="btn g" onClick={cancel}>Cancel</button>
-          <button className="btn" onClick={submit} disabled={busy || uploading > 0}>Create process</button>
+          <button className="btn" onClick={submit} disabled={busy || uploading > 0}>Create ticket</button>
         </div>
       </div>
     </div>

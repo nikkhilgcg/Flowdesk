@@ -15,7 +15,7 @@ function Waiting({ user }) {
   return (
     <main className="wrap"><div className="empty">
       <h1>Your account is waiting for access</h1>
-      <p className="sub">You are signed in as {user.email}. A manager needs to add you to your company (client) before you can see any processes.</p>
+      <p className="sub">You are signed in as {user.email}. A manager needs to add you to your company (client) before you can see any tickets.</p>
       <button className="btn" onClick={() => window.location.reload()}>Check again</button>
     </div></main>
   );
@@ -36,7 +36,7 @@ function Shell() {
         <Link to="/" className="logo"><i />Flowdesk</Link>
         {mgr && (
           <nav className="nav">
-            <NavLink to="/" end>Processes</NavLink>
+            <NavLink to="/" end>Tickets</NavLink>
             <NavLink to="/people">People{waiting > 0 && <span className="tn">{waiting}</span>}</NavLink>
           </nav>
         )}

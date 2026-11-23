@@ -30,8 +30,16 @@ export function dueText(d, done) {
 export const initials = (n) => n.split(" ").map((x) => x[0]).join("").slice(0, 2).toUpperCase();
 
 export function scopeText(u) {
-  if (u.role === "SUPER_MANAGER") return { title: "All processes", sub: "You can see and manage every process of every client, manager and employee. Create, edit, assign, approve and delete from any ticket." };
-  if (u.role === "MANAGER") return { title: "All processes", sub: "You can see every client’s processes. Approve, reject and assign from each ticket." };
-  if (u.role === "ASSIGNEE") return { title: "My assigned processes", sub: "Processes assigned to you, or where someone mentioned you, across clients." };
-  return { title: `${u.client} processes`, sub: `Private to ${u.client}. Processes of other clients are never visible to you.` };
+  if (u.role === "SUPER_MANAGER") return { title: "All tickets", sub: "You can see and manage every ticket of every client, manager and employee. Create, edit, assign, approve and delete from any ticket." };
+  if (u.role === "MANAGER") return { title: "All tickets", sub: "You can see every client’s tickets. Approve, reject and assign from each ticket." };
+  if (u.role === "ASSIGNEE") return { title: "My assigned tickets", sub: "Tickets assigned to you, or where someone mentioned you, across clients." };
+  return { title: `${u.client} tickets`, sub: `Private to ${u.client}. Tickets of other clients are never visible to you.` };
+}
+// Used when a ticket is created without a due date (the server applies the same rule).
+export const DEFAULT_DUE_DAYS = { HIGH: 2, MEDIUM: 4, LOW: 7 };
+export function defaultDueInfo(priority) {
+  const n = DEFAULT_DUE_DAYS[priority] ?? 4;
+  const d = new Date(); d.setDate(d.getDate() + n);
+  const label = n === 7 ? "1 week" : `${n} days`;
+  return { days: n, text: `${d.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })} (${label} from today)` };
 }

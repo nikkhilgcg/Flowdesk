@@ -2,7 +2,7 @@ import "dotenv/config";
 import cors from "cors";
 import express from "express";
 import { auth, authRouter } from "./auth.js";
-import { processRouter } from "./processes.js";
+import { processRouter } from "./tickets.js";
 import { usersRouter } from "./users.js";
 import { prisma } from "./db.js";
 import { HttpError } from "./util.js";

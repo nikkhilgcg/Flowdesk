@@ -1,6 +1,6 @@
 # Flowdesk
 
-Process management module for the in-house ERP.
+Ticket management module for the in-house ERP.
 React (Vite) frontend, Node.js + Express backend (plain JavaScript), PostgreSQL via Prisma, JWT auth.
 
 Demo accounts are listed in `DEMO_USERS.txt` (password for all: `password123`).
@@ -71,29 +71,29 @@ Only the web port (8080) is meant to be reachable by users.
   The role is stored on the `User` table. There is no role switcher in the UI. If someone picks the wrong role, fix or delete
   the user in the database (pgAdmin or Prisma Studio).
 - Login returns a JWT. Every request loads the user from the database, so changes apply immediately.
-- **Each client belongs to one manager** (`Client.managerId`, set to whoever creates it). `scope()` in `backend/src/processes.js`
-  is the only place that decides which processes a user can see. A process outside your scope returns 404, never 403.
-  - Manager: only processes of their own clients. Manager 1 never sees manager 2's processes.
-  - Employee: processes assigned to them, or where they were @mentioned (across managers).
-  - Client: processes of their own client.
+- **Each client belongs to one manager** (`Client.managerId`, set to whoever creates it). `scope()` in `backend/src/tickets.js`
+  is the only place that decides which tickets a user can see. A ticket outside your scope returns 404, never 403.
+  - Manager: only tickets of their own clients. Manager 1 never sees manager 2's tickets.
+  - Employee: tickets assigned to them, or where they were @mentioned (across managers).
+  - Client: tickets of their own client.
 - Managers use the People page to see employees and client users who are not linked to a client yet, and to link client users to
   one of their own clients. A client user who just registered sees "waiting for access" until a manager does this.
-- Everyone can create a process: managers (choose one of their clients, optionally an assignee), employees (choose a client; the process
+- Everyone can create a ticket: managers (choose one of their clients, optionally an assignee), employees (choose a client; the ticket
   is assigned to them so it appears on their board) and clients (always for their own client).
-- Managers add new clients with **+ Add a new client**, under the Client dropdown when creating a process or above the People table.
+- Managers add new clients with **+ Add a new client**, under the Client dropdown when creating a ticket or above the People table.
   Client names must be unique per manager (upper and lower case are treated as the same). Every manager also gets their own "In house" client.
 - Upgrading an existing database: `npx prisma db push` adds `Client.managerId`. On start, the backend gives clients that have no manager
   to the manager if there is exactly one. With several managers, assign them yourself, for example
   `UPDATE "Client" SET "managerId" = <manager user id> WHERE "managerId" IS NULL;`
-- Anyone who can see a process can move it between To Do, In Progress and In Review (Status menu on the ticket).
+- Anyone who can see a ticket can move it between To Do, In Progress and In Review (Status menu on the ticket).
 - Approving and rejecting is a decision only a manager or the client can make, using the Decision menu
-  (Not selected, Approve, Reject). It is only available while the process is In Review. Reject needs a written reason and counts as rework.
-  Once a process is approved it is locked: only a manager or the client can reopen it.
-  The rules are in the status route in `backend/src/processes.js`.
-- Comments can @mention people. The list has all managers and employees, plus the users of that process's own client
-  (never users of other clients). Mentioning an employee gives them access to that process, so it appears on their board.
+  (Not selected, Approve, Reject). It is only available while the ticket is In Review. Reject needs a written reason and counts as rework.
+  Once a ticket is approved it is locked: only a manager or the client can reopen it.
+  The rules are in the status route in `backend/src/tickets.js`.
+- Comments can @mention people. The list has all managers and employees, plus the users of that ticket's own client
+  (never users of other clients). Mentioning an employee gives them access to that ticket, so it appears on their board.
 - Mentioning someone creates a notification for them. The bell in the navbar shows unread notifications
-  ("Riya Mehta mentioned you in PRC-101"), and clicking one opens the ticket and marks it read.
+  ("Riya Mehta mentioned you in TKT-101"), and clicking one opens the ticket and marks it read.
   The home page has a Mentions tab listing every ticket where you were mentioned.
 - Every change writes a `ProcessEvent` row, which is the activity log.
 
@@ -113,11 +113,11 @@ Only the web port (8080) is meant to be reachable by users.
 
 ## Image attachments
 
-- When creating a process, add images with **Add image**, by pasting a screenshot into the description, or by dragging files onto it.
+- When creating a ticket, add images with **Add image**, by pasting a screenshot into the description, or by dragging files onto it.
   On an existing ticket use **Add image**, or paste a screenshot anywhere on the page. Click a thumbnail to view it full size.
-- PNG, JPEG, GIF and WebP only, up to 8 MB each and 10 per process. The file type is checked from the file's bytes, and SVG is refused.
+- PNG, JPEG, GIF and WebP only, up to 8 MB each and 10 per ticket. The file type is checked from the file's bytes, and SVG is refused.
 - Images are stored in Postgres (`Attachment` table), so the normal database backup covers them. Opening an image follows the same
-  rules as the process itself: a user who cannot see the process gets 404. Images uploaded for a ticket that was never created are deleted after 24 hours.
+  rules as the ticket itself: a user who cannot see the ticket gets 404. Images uploaded for a ticket that was never created are deleted after 24 hours.
 - Run `docker compose up --build` after updating. The new table is created on start (`prisma db push`), and nginx now allows 10 MB request bodies.
 - **Comments** take images too: **Add image** next to Send, paste a screenshot into the comment box, or drop files on it
   (up to 5 per comment; a comment can be only images). They show inside the comment in the Activity list, and the person who
@@ -129,3 +129,7 @@ Only the web port (8080) is meant to be reachable by users.
 - Move the JWT from localStorage to an httpOnly cookie, add login rate limiting, and use a strong `JWT_SECRET`.
 - Switch from `prisma db push` to committed migrations (`prisma migrate dev`, then `prisma migrate deploy` in the container).
 - Remove the demo users and run with `SEED_DEMO=false`.
+
+## Due dates
+- A ticket can be created without a due date. It is then set from the priority: **High 2 days, Medium 4 days, Low 1 week** (default priority is Medium).
+- Anyone who can see a ticket can change its due date from the **Due** field on the ticket (an employee cannot change an approved, locked ticket). Each change is written to the activity log (`DUE_DATE` event).
