@@ -47,7 +47,7 @@ export default function Board() {
       {tab === "all" && (
         <div className="stats">
           {STATUSES.map((s) => (
-            <div className={`stat ${s.css}`} key={s.key}><b>{count(s.key)}</b><span>{s.label}</span></div>
+            <div className="stat" key={s.key}><b>{count(s.key)}</b><span>{s.label}</span></div>
           ))}
         </div>
       )}
@@ -83,7 +83,7 @@ export default function Board() {
       ) : view === "board" ? (
         <div className="board">
           {STATUSES.map((s) => (
-            <section className={`col ${s.css}`} key={s.key}>
+            <section className="col" key={s.key}>
               <div className="ch"><span>{s.label}</span><span className="n">{count(s.key)}</span></div>
               {L.filter((p) => p.status === s.key).map((p) => (
                 <Link className="card" to={`/${p.key}`} key={p.key}>
