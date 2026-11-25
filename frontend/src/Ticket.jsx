@@ -5,7 +5,6 @@ import { AuthImage, Lightbox, clipboardImages } from "./Images";
 import { useAuth } from "./auth";
 import Dropdown from "./Dropdown";
 import MentionField from "./MentionField";
-import Loader from "./Loader";
 import { fdate, fmt, PRIO, ROLE_LABEL, SL, STATUSES } from "./lib";
 
 function eventText(e) {
@@ -191,7 +190,7 @@ export default function Ticket() {
         <Link className="btn" to="/">Back to board</Link>
       </div></main>
     );
-  if (!p) return <main className="wrap"><Loader label="Loading ticket" /></main>;
+  if (!p) return <main className="wrap"><div className="empty">Loading…</div></main>;
 
   const mgr = user.role === "MANAGER" || user.role === "SUPER_MANAGER";   // a super manager can do everything a manager can, on every ticket
   const run = async (fn) => {
@@ -205,8 +204,10 @@ export default function Ticket() {
     move(v);
   };
 
-  // Approving and rejecting are decisions for a manager or the client.
-  const decider = mgr || user.role === "CLIENT";
+  // Approving, rejecting and reassigning are for the manager who owns the client (or any super manager), and the client.
+  // A manager who was only assigned this ticket works on it like a team member.
+  const owner = !!p.canManage;
+  const decider = owner || user.role === "CLIENT";
   const pickDecision = (v) => {
     if (v === "APPROVE") move("APPROVED");
     else if (v === "REJECT") setRej(true);
@@ -338,14 +339,14 @@ export default function Ticket() {
                   value: s.key, label: s.label,
                   disabled: s.key === "APPROVED" ? p.status !== "APPROVED" : s.key === "TODO" && p.status === "IN_REVIEW" && !decider,
                 }))} />
-              {p.status === "APPROVED" && !decider && <div className="note lock">Approved and locked. A manager or the client can reopen it.</div>}
+              {p.status === "APPROVED" && !decider && <div className="note lock">Approved and locked. The client’s manager or the client can reopen it.</div>}
             </dd>
             <dt>Client</dt><dd>{p.client.name}</dd>
             <dt>Assignee</dt>
-            <dd>{mgr ? (
+            <dd>{owner ? (
               <Dropdown ariaLabel="Assignee" value={p.assignee?.id ?? ""} placeholder="Unassigned"
                 onChange={(v) => run(() => api(`/tickets/${p.key}`, { method: "PATCH", body: { assigneeId: v ? Number(v) : null } }))}
-                options={[{ value: "", label: "Unassigned" }, ...(meta?.assignees ?? []).map((a) => ({ value: a.id, label: a.name, person: true }))]} />) : (p.assignee?.name ?? "Unassigned")}</dd>
+                options={[{ value: "", label: "Unassigned" }, ...(meta?.assignees ?? []).map((a) => ({ value: a.id, label: a.name, person: true, sub: ROLE_LABEL[a.role] }))]} />) : (p.assignee?.name ?? "Unassigned")}</dd>
             <dt>Priority</dt><dd><span className={`pc ${PRIO[p.priority].css}`}><i />{PRIO[p.priority].label}</span></dd>
             <dt>Due</dt>
             <dd>

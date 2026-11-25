@@ -5,7 +5,7 @@ import AddClient from "./AddClient";
 import Dropdown from "./Dropdown";
 import MentionField from "./MentionField";
 import { useAuth } from "./auth";
-import { defaultDueInfo } from "./lib";
+import { defaultDueInfo, ROLE_LABEL } from "./lib";
 
 export default function NewTicket({ onClose, onCreated }) {
   const { user } = useAuth();
@@ -134,7 +134,7 @@ export default function NewTicket({ onClose, onCreated }) {
           <>
             <label htmlFor="a">Assignee</label>
             <Dropdown id="a" value={f.assigneeId} onChange={(v) => set("assigneeId", v)}
-              options={[{ value: "", label: "Unassigned" }, ...(meta?.assignees ?? []).map((a) => ({ value: a.id, label: a.name, person: true }))]} />
+              options={[{ value: "", label: "Unassigned" }, ...(meta?.assignees ?? []).map((a) => ({ value: a.id, label: a.name, person: true, sub: ROLE_LABEL[a.role] }))]} />
           </>
         )}
         <p className="hint">The ID and created time are generated automatically. You can change the due date later from the ticket.{user.role === "ASSIGNEE" && " The ticket is assigned to you."}</p>

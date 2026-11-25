@@ -16,20 +16,27 @@ const defaultDue = (priority) => {
 const STATUSES = ["TODO", "IN_PROGRESS", "IN_REVIEW", "APPROVED"];
 
 // ---- visibility: the single place that decides who can see which ticket ----
-// A manager sees only the tickets of the clients they own (so manager 1 never sees manager 2's work).
+// A manager sees the tickets of the clients they own, plus any ticket assigned to them or where they were @mentioned
+// (so manager 1 never sees manager 2's other work).
 // A team member sees tickets assigned to them, plus any ticket where they were @mentioned in a comment.
 // A super manager sees every ticket of every client and manager, and can do everything a manager can.
 const scope = (u) =>
   u.role === "SUPER_MANAGER"
     ? {}
     : u.role === "MANAGER"
-      ? { client: { managerId: u.id } }
+      ? { OR: [{ client: { managerId: u.id } }, { assigneeId: u.id }, { events: { some: { mentions: { has: u.id } } } }] }
       : u.role === "ASSIGNEE"
       ? { OR: [{ assigneeId: u.id }, { events: { some: { mentions: { has: u.id } } } }] }
       : { clientId: u.clientId ?? -1 };
 
 // A super manager can do everything a manager can, for every client (not only their own).
 const isManager = (u) => u.role === "MANAGER" || u.role === "SUPER_MANAGER";
+
+// People a ticket can be assigned to: team members and managers.
+const ASSIGNABLE = ["ASSIGNEE", "MANAGER", "SUPER_MANAGER"];
+// The manager who owns the ticket's client (and any super manager) decides: approve, reject, reopen and reassign.
+// A manager who was only assigned the ticket works on it like a team member.
+const ownsTicket = (u, p) => u.role === "SUPER_MANAGER" || (u.role === "MANAGER" && p.client.managerId === u.id);
 
 // Shown wherever the person behind a comment, status change or image has been deleted from the database.
 const DELETED_USER = "Deleted user";
@@ -65,12 +72,11 @@ const find = async (u, key) => {
   return p;
 };
 
-// People who can be @mentioned on a ticket: the manager who owns its client, all team members, plus the users of
-// this ticket's own client. Never other managers or users of other clients. Mentioning a team member gives them access.
+// People who can be @mentioned on a ticket: all staff (team members, managers and super managers), plus the users of
+// this ticket's own client. Never users of other clients. Mentioning a team member or a manager gives them access.
 const mentionable = async (p) => {
-  const c = await prisma.client.findUnique({ where: { id: p.clientId }, select: { managerId: true } });
   return prisma.user.findMany({
-    where: { OR: [{ id: c?.managerId ?? -1 }, { role: "ASSIGNEE" }, { clientId: p.clientId }] },
+    where: { OR: [{ role: { in: ASSIGNABLE } }, { clientId: p.clientId }] },
     select: { id: true, name: true, role: true },
     orderBy: { name: "asc" },
   });
@@ -112,7 +118,7 @@ processRouter.get(
         select: { id: true, name: true, manager: { select: { name: true } } },
         orderBy: { name: "asc" },
       }),
-      mgr || sup ? prisma.user.findMany({ where: { role: "ASSIGNEE" }, select: { id: true, name: true }, orderBy: { name: "asc" } }) : [],
+      mgr || sup ? prisma.user.findMany({ where: { role: { in: ASSIGNABLE } }, select: { id: true, name: true, role: true }, orderBy: { name: "asc" } }) : [],
     ]);
     const clients = rows.map((c) => ({ id: c.id, name: c.name, ...(mgr ? {} : { owner: c.manager?.name ?? null }) }));
     res.json({ clients: sortClients(clients), assignees });
@@ -188,6 +194,7 @@ processRouter.get(
     for (const a of all) if (a.inComment) byEvent.set(a.eventId, [...(byEvent.get(a.eventId) ?? []), attDto(a)]);
     res.json({
       ...dto(p),
+      canManage: ownsTicket(req.user, p),
       statusBy: last ? (last.actor?.name ?? DELETED_USER) : null,
       // Whoever created it, the manager who owns its client, and any super manager can delete a ticket.
       canDelete: req.user.role === "SUPER_MANAGER" || (req.user.role === "MANAGER" && p.client.managerId === req.user.id) || createdBy === req.user.id,
@@ -320,10 +327,10 @@ processRouter.post(
     // Team Members and super managers can use any client that has a manager.
     if ((u.role === "ASSIGNEE" || u.role === "SUPER_MANAGER") && !(await prisma.client.findFirst({ where: { id: clientId, managerId: { not: null } }, select: { id: true } })))
       throw new HttpError(400, "Unknown client");
-    // Managers can assign anyone. A ticket created by an assignee is assigned to them, so it shows up on their board.
+    // Managers can assign any team member or manager. A ticket created by an assignee is assigned to them, so it shows up on their board.
     let assigneeId = u.role === "ASSIGNEE" ? u.id : null;
     if (isManager(u) && b.assigneeId) {
-      const a = await prisma.user.findFirst({ where: { id: b.assigneeId, role: "ASSIGNEE" } });
+      const a = await prisma.user.findFirst({ where: { id: b.assigneeId, role: { in: ASSIGNABLE } } });
       if (!a) throw new HttpError(400, "Unknown assignee");
       assigneeId = a.id;
     }
@@ -362,7 +369,8 @@ processRouter.patch(
     if (!isManager(u)) throw new HttpError(403, "Managers only");
     const { assigneeId } = z.object({ assigneeId: z.number().int().nullable() }).parse(req.body);
     const p = await find(u, req.params.key);
-    const a = assigneeId ? await prisma.user.findFirst({ where: { id: assigneeId, role: "ASSIGNEE" } }) : null;
+    if (!ownsTicket(u, p)) throw new HttpError(403, "Only the manager who owns this client can change the assignee");
+    const a = assigneeId ? await prisma.user.findFirst({ where: { id: assigneeId, role: { in: ASSIGNABLE } } }) : null;
     if (assigneeId && !a) throw new HttpError(400, "Unknown assignee");
     const [updated] = await prisma.$transaction([
       prisma.process.update({ where: { id: p.id }, data: { assigneeId: a?.id ?? null }, include }),
@@ -460,9 +468,9 @@ processRouter.post(
     if (p.status === to) throw new HttpError(400, "The ticket is already in that status");
     const approve = to === "APPROVED";
     const reject = p.status === "IN_REVIEW" && to === "TODO";
-    const decider = isManager(u) || u.role === "CLIENT";
-    if ((approve || reject) && !decider) throw new HttpError(403, "Only a manager or the client can approve or reject");
-    if (p.status === "APPROVED" && !decider) throw new HttpError(403, "This ticket is approved and locked. Only a manager or the client can reopen it");
+    const decider = ownsTicket(u, p) || u.role === "CLIENT";
+    if ((approve || reject) && !decider) throw new HttpError(403, "Only the client's manager or the client can approve or reject");
+    if (p.status === "APPROVED" && !decider) throw new HttpError(403, "This ticket is approved and locked. Only the client's manager or the client can reopen it");
     if (approve && p.status !== "IN_REVIEW") throw new HttpError(400, "Only a ticket in review can be approved");
     if (reject && !reason) throw new HttpError(400, "A reason is required to reject");
     await prisma.$transaction(async (tx) => {

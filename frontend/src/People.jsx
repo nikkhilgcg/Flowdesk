@@ -81,6 +81,34 @@ function PersonCard({ u, clients, onSaved }) {
   );
 }
 
+// The signed-in manager's own profile (read-only).
+function MyCard({ u, clients, sup }) {
+  const mine = sup ? [] : clients;
+  return (
+    <article className="pc2 mine">
+      <div className="pc2-top">
+        <span className="pav mgr" aria-hidden="true">{initials(u.name)}</span>
+        <div className="pid">
+          <div className="nm" title={u.name}>{u.name}<span className="you">You</span></div>
+          <div className="em" title={u.email}>{u.email}</div>
+        </div>
+        <span className="rchip">{ROLE_LABEL[u.role]}</span>
+      </div>
+      <div className="pc2-body">
+        {sup
+          ? <div className="pnote"><Icon d={I.client} size={18} />Full access to every client, ticket and team member</div>
+          : (
+            <div className="pf">
+              <label>{mine.length === 1 ? "Manages 1 client" : `Manages ${mine.length} clients`}</label>
+              <div className="pchips">{mine.length ? mine.map((c) => <span className="chip" key={c.id}>{c.name}</span>) : <span className="note">No clients yet</span>}</div>
+            </div>
+          )}
+      </div>
+      <div className="pc2-foot"><span className="pdate"><Icon d={I.cal} size={14} />Registered {fdate(u.createdAt)}</span></div>
+    </article>
+  );
+}
+
 const Group = ({ title, n, warn, children }) => (
   <>
     <div className={`pgh${warn ? " warn" : ""}`}>{title}<span className="n">{n}</span></div>
@@ -123,6 +151,7 @@ export default function People() {
     { k: "pending", n: waiting, label: "Need a client", icon: I.wait, warn: true },
   ];
 
+  const me = shown.filter((u) => u.id === user.id);
   const pending = shown.filter((u) => u.pending);
   const team = shown.filter((u) => u.role === "ASSIGNEE");
   const linked = shown.filter((u) => u.role === "CLIENT" && !u.pending);
@@ -171,6 +200,7 @@ export default function People() {
         </div>
       ) : (
         <>
+          {me.length > 0 && <Group title="Your profile" n={me.length}>{me.map((u) => <MyCard key={u.id} u={u} clients={clients} sup={user.role === "SUPER_MANAGER"} />)}</Group>}
           {pending.length > 0 && <Group title="Waiting for a client" n={pending.length} warn>{pending.map(card)}</Group>}
           {team.length > 0 && <Group title="Team members" n={team.length}>{team.map(card)}</Group>}
           {linked.length > 0 && <Group title="Client users" n={linked.length}>{linked.map(card)}</Group>}

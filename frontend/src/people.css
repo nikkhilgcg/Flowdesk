@@ -75,3 +75,9 @@
 
 @media(max-width:900px){.pstats{grid-template-columns:repeat(2,1fr)}.psearch{max-width:none}}
 @media(max-width:520px){.psearch{flex:1 1 100%}.pgrid{grid-template-columns:1fr}.pstat{padding:14px}.pstat-tx b{font-size:24px}}
+
+/* own profile */
+.pc2.mine{border-color:#b9d3c7;background:linear-gradient(var(--as),var(--sf) 90px)}
+.pav.mgr{background:var(--ac2);color:#fff}
+.you{display:inline-block;margin-left:8px;vertical-align:1px;font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:2px 8px;border-radius:99px;background:var(--ac);color:#fff}
+.pchips{display:flex;flex-wrap:wrap;gap:6px}
