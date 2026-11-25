@@ -52,6 +52,7 @@ const dto = (p) => ({
   status: p.status,
   reworkCount: p.reworkCount,
   createdAt: p.createdAt,
+  approvedAt: p.approvedAt,
   client: { id: p.client.id, name: p.client.name, owner: p.client.manager?.name ?? null },
   assignee: p.assignee,
 });
@@ -387,10 +388,12 @@ processRouter.put(
     if (p.dueDate && p.dueDate.getTime() === next.getTime()) throw new HttpError(400, "Nothing was changed");
     const day = (d) => (d ? d.toISOString().slice(0, 10) : "none");
     const [updated] = await prisma.$transaction([
-      prisma.process.update({ where: { id: p.id }, data: { dueDate: next }, include }),
+      prisma.process.update({ where: { id: p.id }, data: { dueDate: next, overdueNotifiedDays: 0 }, include }),
       prisma.processEvent.create({
         data: { processId: p.id, actorId: u.id, type: "DUE_DATE", body: `changed the due date from ${day(p.dueDate)} to ${day(next)}` },
       }),
+      // An unread "overdue by N days" reminder is out of date once the due date moves.
+      prisma.notification.deleteMany({ where: { processId: p.id, type: "OVERDUE", readAt: null } }),
     ]);
     res.json(dto(updated));
   })
@@ -466,12 +469,19 @@ processRouter.post(
       // updateMany with the old status guards against two people acting at once
       const r = await tx.process.updateMany({
         where: { id: p.id, status: p.status },
-        data: { status: to, ...(reject ? { reworkCount: { increment: 1 } } : {}) },
+        data: {
+          status: to,
+          ...(reject ? { reworkCount: { increment: 1 } } : {}),
+          // approved = completed: remember when. Reopening clears it.
+          ...(approve ? { approvedAt: new Date() } : p.status === "APPROVED" ? { approvedAt: null } : {}),
+        },
       });
       if (r.count === 0) throw new HttpError(409, "Status changed meanwhile, please refresh");
       await tx.processEvent.create({
         data: { processId: p.id, actorId: u.id, type: "STATUS", fromStatus: p.status, toStatus: to, body: reject ? reason : null },
       });
+      // Approved tickets are no longer overdue: remove their unread overdue reminders.
+      if (approve) await tx.notification.deleteMany({ where: { processId: p.id, type: "OVERDUE", readAt: null } });
     });
     res.json(dto(await find(u, req.params.key)));
   })
@@ -534,7 +544,9 @@ processRouter.get(
         type: n.type,
         key: keyOf(n.processId),
         actor: n.actor?.name ?? DELETED_USER,
-        text: ((n.event.type === "CREATED" ? n.process.description || n.process.title : n.event.body) ?? "").slice(0, 140),
+        // OVERDUE reminders show the ticket title and how many days late it was when the reminder was sent.
+        days: n.overdueDays,
+        text: (n.type === "OVERDUE" ? n.process.title : ((n.event?.type === "CREATED" ? n.process.description || n.process.title : n.event?.body) ?? "")).slice(0, 140),
         readAt: n.readAt,
         createdAt: n.createdAt,
       })),

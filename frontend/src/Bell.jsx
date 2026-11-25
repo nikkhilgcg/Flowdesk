@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "./api";
 import { initials } from "./lib";
+import "./filters.css";   // .av.od / .ni.od (overdue reminders)
 
 function ago(d) {
   const s = Math.max(1, Math.floor((Date.now() - new Date(d).getTime()) / 1000));
@@ -56,11 +57,13 @@ export default function Bell() {
           {data.items.length === 0 && <div className="empty small">You’re all caught up.</div>}
           <div className="nl">
             {data.items.map((n) => (
-              <button key={n.id} className={`ni${n.readAt ? "" : " un"}`} onClick={() => go(n)}>
-                <span className="av">{initials(n.actor)}</span>
+              <button key={n.id} className={`ni${n.readAt ? "" : " un"}${n.type === "OVERDUE" ? " od" : ""}`} onClick={() => go(n)}>
+                <span className={`av${n.type === "OVERDUE" ? " od" : ""}`}>{n.type === "OVERDUE" ? "!" : initials(n.actor)}</span>
                 <span className="nb">
-                  <span><b>{n.actor}</b> mentioned you in <b>{n.key}</b></span>
-                  {n.text && <span className="nt">“{n.text}”</span>}
+                  {n.type === "OVERDUE"
+                    ? <span><b>{n.key}</b> is overdue by <b>{n.days} day{n.days === 1 ? "" : "s"}</b></span>
+                    : <span><b>{n.actor}</b> mentioned you in <b>{n.key}</b></span>}
+                  {n.text && <span className="nt">{n.type === "OVERDUE" ? n.text : `“${n.text}”`}</span>}
                   <small>{ago(n.createdAt)}</small>
                 </span>
                 {!n.readAt && <i className="dot" aria-label="Unread" />}

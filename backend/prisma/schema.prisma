@@ -76,6 +76,11 @@ model Process {
   dueDate     DateTime?
   status      Status         @default(TODO)
   reworkCount Int            @default(0)
+  // Set when the ticket is approved (approved = completed) and cleared if it is reopened.
+  // The "completed in month" filter on the dashboard uses it.
+  approvedAt  DateTime?
+  // The "overdue by N days" the last overdue reminder was sent for (0 = none yet). Reset when the due date changes.
+  overdueNotifiedDays Int    @default(0)
   clientId    Int
   client      Client         @relation(fields: [clientId], references: [id])
   assigneeId  Int?
@@ -118,8 +123,11 @@ model Notification {
   actor     User?        @relation("notifier", fields: [actorId], references: [id], onDelete: SetNull)
   processId Int
   process   Process      @relation(fields: [processId], references: [id], onDelete: Cascade)
-  eventId   Int
-  event     ProcessEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  // MENTION notifications point at the comment/description event. OVERDUE ones have no event.
+  eventId   Int?
+  event     ProcessEvent? @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  // OVERDUE only: how many days past the due date this reminder was sent for.
+  overdueDays Int?
   readAt    DateTime?
   createdAt DateTime     @default(now())
 

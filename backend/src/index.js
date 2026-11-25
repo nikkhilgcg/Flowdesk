@@ -5,6 +5,7 @@ import { auth, authRouter } from "./auth.js";
 import { processRouter } from "./tickets.js";
 import { usersRouter } from "./users.js";
 import { prisma } from "./db.js";
+import { startJobs } from "./jobs.js";
 import { HttpError } from "./util.js";
 
 const app = express();
@@ -37,6 +38,9 @@ app.listen(port, () => console.log(`API running on http://localhost:${port}`));
   for (const c of await prisma.client.findMany({ where: { managerId: null }, select: { id: true } }))
     await prisma.client.update({ where: { id: c.id }, data: { managerId: managers[0].id } }).catch(() => {});
 })().catch(() => {});
+
+// Background work: fills in approvedAt for tickets approved before it existed, and sends the daily overdue reminders.
+startJobs();
 
 // Images uploaded for a ticket or comment that was never sent are removed after a day.
 setInterval(

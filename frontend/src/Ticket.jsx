@@ -5,6 +5,7 @@ import { AuthImage, Lightbox, clipboardImages } from "./Images";
 import { useAuth } from "./auth";
 import Dropdown from "./Dropdown";
 import MentionField from "./MentionField";
+import Loader from "./Loader";
 import { fdate, fmt, PRIO, ROLE_LABEL, SL, STATUSES } from "./lib";
 
 function eventText(e) {
@@ -190,7 +191,7 @@ export default function Ticket() {
         <Link className="btn" to="/">Back to board</Link>
       </div></main>
     );
-  if (!p) return <main className="wrap"><div className="empty">Loading…</div></main>;
+  if (!p) return <main className="wrap"><Loader label="Loading ticket" /></main>;
 
   const mgr = user.role === "MANAGER" || user.role === "SUPER_MANAGER";   // a super manager can do everything a manager can, on every ticket
   const run = async (fn) => {
