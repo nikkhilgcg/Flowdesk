@@ -43,12 +43,13 @@ export default function Board() {
   const month = sp.get("month") || "all";
   const person = staff ? sp.get("person") || "all" : "all";   // "all", "none" (unassigned) or a user id
   const client = staff ? sp.get("client") || "all" : "all";
+  const creator = staff ? sp.get("creator") || "all" : "all";   // "all" or a user id
   const setFilter = (key, value) => {
     const next = new URLSearchParams(sp);
     if (value === "all") next.delete(key); else next.set(key, value);
     setSp(next, { replace: true });
   };
-  const filtered = month !== "all" || person !== "all" || client !== "all";
+  const filtered = month !== "all" || person !== "all" || client !== "all" || creator !== "all";
 
   useEffect(() => { api("/tickets").then(setItems).catch((e) => setErr(e.message)); }, []);
   const L = useMemo(
@@ -63,6 +64,11 @@ export default function Board() {
     for (const p of items || []) if (p.assignee) m.set(p.assignee.id, p.assignee.name);
     return [...m].sort((a, b) => a[1].localeCompare(b[1]));
   }, [items]);
+  const creators = useMemo(() => {
+    const m = new Map();
+    for (const p of items || []) if (p.createdBy) m.set(p.createdBy.id, p.createdBy.name);
+    return [...m].sort((a, b) => a[1].localeCompare(b[1]));
+  }, [items]);
   const clients = useMemo(() => {
     const m = new Map();
     for (const p of items || []) m.set(p.client.id, sup && p.client.owner ? `${p.client.name} · ${p.client.owner}` : p.client.name);
@@ -75,7 +81,8 @@ export default function Board() {
   const matches = (p) =>
     (month === "all" || monthOf(p) === month) &&
     (person === "all" || (person === "none" ? !p.assignee : String(p.assignee?.id) === person)) &&
-    (client === "all" || String(p.client.id) === client);
+    (client === "all" || String(p.client.id) === client) &&
+    (creator === "all" || String(p.createdBy?.id) === creator);
   const V = L.filter(matches);   // what the board, list and the numbers above them show
 
   const count = (s) => V.filter((p) => p.status === s).length;
@@ -83,12 +90,14 @@ export default function Board() {
   const mentionTotal = items.filter((p) => p.mention).length;
 
   const monthOpts = [{ value: "all", label: "All time" }, ...(month !== "all" && !months.includes(month) ? [month] : []).concat(months).map((k) => ({ value: k, label: monthLabel(k) }))];
+  const creatorOpts = [{ value: "all", label: "Anyone" }, ...creators.map(([id, name]) => ({ value: String(id), label: name }))];
   const personOpts = [{ value: "all", label: "Everyone" }, ...people.map(([id, name]) => ({ value: String(id), label: name })), { value: "none", label: "Unassigned" }];
   const clientOpts = [{ value: "all", label: "All clients" }, ...clients.map(([id, name]) => ({ value: String(id), label: name }))];
   const label = (opts, v) => opts.find((o) => o.value === v)?.label;
   const summary = [
     month !== "all" && label(monthOpts, month),
-    person !== "all" && label(personOpts, person),
+    person !== "all" && (person === "none" ? "Unassigned" : `Assigned to ${label(personOpts, person)}`),
+    creator !== "all" && `Created by ${label(creatorOpts, creator)}`,
     client !== "all" && label(clientOpts, client),
   ].filter(Boolean).join(" · ");
 
@@ -106,7 +115,8 @@ export default function Board() {
         <>
           <div className="fbar">
             <div className="fl"><label>Month</label><Dropdown ariaLabel="Filter by month" value={month} onChange={(v) => setFilter("month", v)} options={monthOpts} /></div>
-            {staff && <div className="fl"><label>Person</label><Dropdown ariaLabel="Filter by person" value={person} onChange={(v) => setFilter("person", v)} options={personOpts} /></div>}
+            {staff && <div className="fl"><label>Assigned to</label><Dropdown ariaLabel="Filter by assigned person" value={person} onChange={(v) => setFilter("person", v)} options={personOpts} /></div>}
+            {staff && <div className="fl"><label>Created by</label><Dropdown ariaLabel="Filter by creator" value={creator} onChange={(v) => setFilter("creator", v)} options={creatorOpts} /></div>}
             {staff && <div className="fl"><label>Client</label><Dropdown ariaLabel="Filter by client" value={client} onChange={(v) => setFilter("client", v)} options={clientOpts} /></div>}
             <span className="sp" />
             {filtered && <button className="btn g" onClick={clear}>Clear filters</button>}

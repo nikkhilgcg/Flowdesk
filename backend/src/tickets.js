@@ -170,7 +170,13 @@ processRouter.get(
     const last = new Map();
     for (const m of mentions)
       if (!last.has(m.processId)) last.set(m.processId, { by: m.actor?.name ?? DELETED_USER, at: m.createdAt, text: ((m.type === "CREATED" ? m.process.description : m.body) ?? "").slice(0, 160) });
-    res.json(rows.map((r) => ({ ...dto(r), mention: last.get(r.id) ?? null })));
+    // Who created each ticket (for the "Created by" filter on the board).
+    const made = await prisma.processEvent.findMany({
+      where: { type: "CREATED", processId: { in: rows.map((r) => r.id) } },
+      select: { processId: true, actor: { select: { id: true, name: true } } },
+    });
+    const creator = new Map(made.map((e) => [e.processId, e.actor ?? null]));
+    res.json(rows.map((r) => ({ ...dto(r), createdBy: creator.get(r.id) ?? null, mention: last.get(r.id) ?? null })));
   })
 );
 
