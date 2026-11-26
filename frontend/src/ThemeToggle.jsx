@@ -2,13 +2,13 @@ import { useEffect, useState } from "react";
 
 const KEY = "flowdesk-theme";
 
-// Saved choice wins; otherwise follow the operating system.
+// Saved choice wins; otherwise default to light.
 function initialTheme() {
   try {
     const saved = localStorage.getItem(KEY);
     if (saved === "light" || saved === "dark") return saved;
   } catch {}
-  return window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  return "light";
 }
 
 export default function ThemeToggle() {
