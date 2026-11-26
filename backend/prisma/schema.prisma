@@ -134,11 +134,13 @@ model Notification {
   @@index([userId, readAt])
 }
 
-// Images added to a ticket. The bytes live in Postgres, so they are backed up with the rest of the data.
+// Images and files (PDF, Word, Excel) added to a ticket. The bytes live in Postgres, so they are backed up with the rest of the data.
 // processId is null while the ticket is still being created (visible to the uploader only).
 model Attachment {
   id         Int      @id @default(autoincrement())
   mime       String
+  // Original file name (shown on PDF, Word and Excel files). Empty for older images.
+  name       String   @default("")
   size       Int
   data       Bytes
   uploaderId Int?

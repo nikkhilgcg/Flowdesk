@@ -347,15 +347,37 @@ processRouter.get(
   }),
 );
 
-// ---- image attachments ----
+// ---- attachments: images, PDF, Word and Excel files ----
 const MAX_IMG = 8 * 1024 * 1024;
+const MAX_FILE = 10 * 1024 * 1024;
 const MAX_PER_PROCESS = 10;
-const imageBody = express.raw({
-  type: ["image/png", "image/jpeg", "image/gif", "image/webp"],
-  limit: MAX_IMG,
+// Images are sent with their own type; documents are sent as application/octet-stream
+// together with an X-File-Name header. The real type is always decided from the bytes.
+const fileBody = express.raw({
+  type: ["image/png", "image/jpeg", "image/gif", "image/webp", "application/octet-stream"],
+  limit: MAX_FILE,
 });
+const DOC_MIME = {
+  pdf: "application/pdf",
+  doc: "application/msword",
+  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  xls: "application/vnd.ms-excel",
+  xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+};
+const extOf = (n) => (n.match(/\.([a-z0-9]+)$/i)?.[1] ?? "").toLowerCase();
+// File name from the browser: no path characters, no control characters, at most 120 characters.
+const cleanName = (raw) => {
+  let n = String(raw ?? "");
+  try { n = decodeURIComponent(n); } catch { /* keep as sent */ }
+  n = n.replace(/[\u0000-\u001f\u007f"\\\/:*?<>|]/g, "").trim();
+  if (n.length > 120) {
+    const e = extOf(n);
+    n = n.slice(0, 120 - (e ? e.length + 1 : 0)) + (e ? "." + e : "");
+  }
+  return n;
+};
 // The file's real type comes from its first bytes, never from what the browser claims.
-const sniff = (b) => {
+const sniff = (b, ext) => {
   if (b.length < 12) return null;
   if (b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47)
     return "image/png";
@@ -366,18 +388,34 @@ const sniff = (b) => {
     b.toString("ascii", 8, 12) === "WEBP"
   )
     return "image/webp";
+  if (b.toString("latin1", 0, 5) === "%PDF-") return DOC_MIME.pdf;
+  // .docx and .xlsx are zip files: the folder names inside tell them apart.
+  if (b[0] === 0x50 && b[1] === 0x4b && b[2] === 0x03 && b[3] === 0x04 && b.includes("[Content_Types].xml")) {
+    if (b.includes("word/")) return DOC_MIME.docx;
+    if (b.includes("xl/")) return DOC_MIME.xlsx;
+    return null;
+  }
+  // Old .doc and .xls share one container format, so the file extension picks between them.
+  if (b[0] === 0xd0 && b[1] === 0xcf && b[2] === 0x11 && b[3] === 0xe0 && b[4] === 0xa1 && b[5] === 0xb1 && b[6] === 0x1a && b[7] === 0xe1) {
+    if (ext === "doc") return DOC_MIME.doc;
+    if (ext === "xls") return DOC_MIME.xls;
+  }
   return null;
 };
-const readImage = (req) => {
-  const bad = new HttpError(415, "Upload a PNG, JPEG, GIF or WebP image");
+const readUpload = (req) => {
+  const bad = new HttpError(415, "Upload an image, PDF, Word or Excel file");
   if (!Buffer.isBuffer(req.body) || !req.body.length) throw bad;
-  const mime = sniff(req.body);
+  const name = cleanName(req.headers["x-file-name"]);
+  const mime = sniff(req.body, extOf(name));
   if (!mime) throw bad;
-  return { mime, size: req.body.length, data: req.body };
+  if (mime.startsWith("image/") && req.body.length > MAX_IMG)
+    throw new HttpError(413, "Images can be up to 8 MB");
+  return { mime, name, size: req.body.length, data: req.body };
 };
 const attMeta = {
   id: true,
   mime: true,
+  name: true,
   size: true,
   createdAt: true,
   uploaderId: true,
@@ -386,6 +424,7 @@ const attMeta = {
 const attDto = (a) => ({
   id: a.id,
   mime: a.mime,
+  name: a.name,
   size: a.size,
   createdAt: a.createdAt,
   uploaderId: a.uploaderId,
@@ -404,9 +443,9 @@ const canOpen = async (u, a) =>
 // Uploaded while writing a new ticket; attached to it when the ticket is created.
 processRouter.post(
   "/attachments",
-  imageBody,
+  fileBody,
   h(async (req, res) => {
-    const img = readImage(req);
+    const img = readUpload(req);
     if (
       (await prisma.attachment.count({
         where: { uploaderId: req.user.id, processId: null },
@@ -415,7 +454,7 @@ processRouter.post(
     )
       throw new HttpError(
         400,
-        "Too many unsent images. Create the ticket first",
+        "Too many unsent files. Create the ticket first",
       );
     const a = await prisma.attachment.create({
       data: { ...img, uploaderId: req.user.id },
@@ -428,13 +467,13 @@ processRouter.post(
 // Added to a ticket that already exists.
 processRouter.post(
   "/tickets/:key/attachments",
-  imageBody,
+  fileBody,
   h(async (req, res) => {
     const u = req.user;
     const p = await find(u, req.params.key);
     if (p.status === "APPROVED" && u.role === "ASSIGNEE")
       throw new HttpError(403, "This ticket is approved and locked");
-    const img = readImage(req);
+    const img = readUpload(req);
     if (
       (await prisma.attachment.count({
         where: { processId: p.id, inComment: false },
@@ -442,7 +481,7 @@ processRouter.post(
     )
       throw new HttpError(
         400,
-        `A ticket can have up to ${MAX_PER_PROCESS} images`,
+        `A ticket can have up to ${MAX_PER_PROCESS} attachments`,
       );
     const a = await prisma.attachment.create({
       data: { ...img, uploaderId: u.id, processId: p.id },
@@ -452,15 +491,15 @@ processRouter.post(
   }),
 );
 
-// Image for a comment that is being written. Stays a draft until the comment is posted.
+// Image or file for a comment that is being written. Stays a draft until the comment is posted.
 const MAX_PER_COMMENT = 5;
 processRouter.post(
   "/tickets/:key/comment-images",
-  imageBody,
+  fileBody,
   h(async (req, res) => {
     const u = req.user;
     const p = await find(u, req.params.key);
-    const img = readImage(req);
+    const img = readUpload(req);
     if (
       (await prisma.attachment.count({
         where: {
@@ -473,7 +512,7 @@ processRouter.post(
     )
       throw new HttpError(
         400,
-        `A comment can have up to ${MAX_PER_COMMENT} images`,
+        `A comment can have up to ${MAX_PER_COMMENT} files`,
       );
     const a = await prisma.attachment.create({
       data: { ...img, uploaderId: u.id, processId: p.id, inComment: true },
@@ -491,12 +530,17 @@ processRouter.get(
       ? await prisma.attachment.findUnique({ where: { id } })
       : null;
     if (!a || !(await canOpen(req.user, a)))
-      throw new HttpError(404, "Image not found");
+      throw new HttpError(404, "File not found");
+    const label = a.name || "file";
     res.set({
       "Content-Type": a.mime,
       "Content-Length": a.size,
       "X-Content-Type-Options": "nosniff",
       "Cache-Control": "private, max-age=86400",
+      // Images show in the page; documents are always downloaded, never opened by the browser.
+      ...(a.mime.startsWith("image/")
+        ? {}
+        : { "Content-Disposition": `attachment; filename="${label.replace(/[^\x20-\x7e]/g, "_")}"; filename*=UTF-8''${encodeURIComponent(label)}` }),
     });
     res.end(Buffer.from(a.data));
   }),
@@ -514,7 +558,7 @@ processRouter.delete(
         })
       : null;
     if (!a || !(await canOpen(u, a)))
-      throw new HttpError(404, "Image not found");
+      throw new HttpError(404, "File not found");
     if (a.uploaderId !== u.id && !isManager(u))
       throw new HttpError(
         403,
@@ -865,7 +909,7 @@ processRouter.post(
           .default([]),
       })
       .refine((v) => v.body || v.attachmentIds.length, {
-        message: "Write a comment or add an image",
+        message: "Write a comment or add a file",
       })
       .parse(req.body);
     const p = await find(u, req.params.key);
@@ -899,7 +943,7 @@ processRouter.post(
         if (r.count !== attachmentIds.length)
           throw new HttpError(
             400,
-            "An image could not be attached. Add it again",
+            "A file could not be attached. Add it again",
           );
       }
       if (ids.length)

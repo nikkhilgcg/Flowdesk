@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { api, imageProblem, uploadImage } from "./api";
-import { AuthImage, Lightbox, clipboardImages } from "./Images";
+import { ACCEPT, api, fileProblem, uploadFile } from "./api";
+import { AuthImage, FileChip, Lightbox, clipboardImages, isImg } from "./Images";
 import { useAuth } from "./auth";
 import Dropdown from "./Dropdown";
 import MentionField from "./MentionField";
@@ -37,7 +37,7 @@ function Body({ text, ids, people, meId }) {
 // Comment box: typing @ opens a list of people who can see this ticket.
 function CommentBox({ pkey, people, onSend }) {
   const [text, setText] = useState("");
-  const [imgs, setImgs] = useState([]);       // images uploaded for this comment: { id, name }
+  const [imgs, setImgs] = useState([]);       // images and files uploaded for this comment: { id, name, mime, size }
   const [uploading, setUploading] = useState(0);
   const [drag, setDrag] = useState(false);
   const [msg, setMsg] = useState("");
@@ -71,12 +71,12 @@ function CommentBox({ pkey, people, onSend }) {
   const addFiles = async (files) => {
     setMsg("");
     for (const f of files) {
-      const bad = imageProblem(f);
+      const bad = fileProblem(f);
       if (bad) { setMsg(bad); continue; }
       setUploading((n) => n + 1);
       try {
-        const a = await uploadImage(`/tickets/${pkey}/comment-images`, f);
-        setImgs((l) => [...l, { id: a.id, name: f.name || "Pasted image" }]);
+        const a = await uploadFile(`/tickets/${pkey}/comment-images`, f);
+        setImgs((l) => [...l, { id: a.id, name: a.name || f.name || "Pasted image", mime: a.mime, size: a.size }]);
       } catch (x) { setMsg(x.message); }
       setUploading((n) => n - 1);
     }
@@ -117,20 +117,25 @@ function CommentBox({ pkey, people, onSend }) {
           </div>
         )}
       </div>
-      <button type="button" className="btn g" onClick={() => file.current.click()} disabled={imgs.length + uploading >= 5}>Add image</button>
-      <input ref={file} type="file" accept="image/png,image/jpeg,image/gif,image/webp" multiple hidden
+      <button type="button" className="btn g" onClick={() => file.current.click()} disabled={imgs.length + uploading >= 5}>Add file</button>
+      <input ref={file} type="file" accept={ACCEPT} multiple hidden
         onChange={(e) => { addFiles([...e.target.files]); e.target.value = ""; }} />
       <button className="btn" disabled={uploading > 0}>Send</button>
     </form>
-    {(imgs.length > 0 || uploading > 0) && (
+    {(imgs.some(isImg) || uploading > 0) && (
       <div className="gal sm">
-        {imgs.map((x, i) => (
+        {imgs.filter(isImg).map((x, i) => (
           <div className="gi" key={x.id}>
             <AuthImage id={x.id} alt={`Image ${i + 1} for this comment: ${x.name}`} />
             <button type="button" className="gx" onClick={() => removeImg(x.id)} aria-label={`Remove image ${i + 1}`}>×</button>
           </div>
         ))}
         {Array.from({ length: uploading }, (_, i) => <div className="gi up" key={"u" + i}><span className="imgph" aria-busy="true">Uploading…</span></div>)}
+      </div>
+    )}
+    {imgs.some((x) => !isImg(x)) && (
+      <div className="fls">
+        {imgs.filter((x) => !isImg(x)).map((x) => <FileChip key={x.id} file={x} onRemove={() => removeImg(x.id)} />)}
       </div>
     )}
     {msg && <div className="err" role="alert">{msg}</div>}
@@ -165,10 +170,10 @@ export default function Ticket() {
   const addImages = useCallback(async (files) => {
     setErr("");
     for (const f of files) {
-      const bad = imageProblem(f);
+      const bad = fileProblem(f);
       if (bad) { setErr(bad); continue; }
       setAdding((n) => n + 1);
-      try { await uploadImage(`/tickets/${key}/attachments`, f); load(); } catch (e) { setErr(e.message); }
+      try { await uploadFile(`/tickets/${key}/attachments`, f); load(); } catch (e) { setErr(e.message); }
       setAdding((n) => n - 1);
     }
   }, [key, load]);
@@ -252,9 +257,9 @@ export default function Ticket() {
                 )}
               </>
             )}
-            {p.attachments.length > 0 && (
+            {p.attachments.some(isImg) && (
               <div className="gal">
-                {p.attachments.map((a, i) => (
+                {p.attachments.filter(isImg).map((a, i) => (
                   <div className="gi" key={a.id}>
                     <button className="gb" onClick={() => setView(a.id)} aria-label={`Open image ${i + 1} full size`}>
                       <AuthImage id={a.id} alt={`Attachment ${i + 1}, added by ${a.by}`} />
@@ -267,11 +272,19 @@ export default function Ticket() {
                 ))}
               </div>
             )}
+            {p.attachments.some((a) => !isImg(a)) && (
+              <div className="fls">
+                {p.attachments.filter((a) => !isImg(a)).map((a) => (
+                  <FileChip key={a.id} file={a}
+                    onRemove={(mgr || a.uploaderId === user.id) ? () => run(() => api(`/attachments/${a.id}`, { method: "DELETE" })) : undefined} />
+                ))}
+              </div>
+            )}
             {!(p.status === "APPROVED" && user.role === "ASSIGNEE") && p.attachments.length < 10 && (
               <div className="attbar">
-                <button className="lnk" onClick={() => pick.current.click()} disabled={adding > 0}>{adding ? "Uploading…" : "Add image"}</button>
-                <span>or paste a screenshot</span>
-                <input ref={pick} type="file" accept="image/png,image/jpeg,image/gif,image/webp" multiple hidden
+                <button className="lnk" onClick={() => pick.current.click()} disabled={adding > 0}>{adding ? "Uploading…" : "Add file"}</button>
+                <span>or paste a screenshot. Images, PDF, Word and Excel, up to 10 MB</span>
+                <input ref={pick} type="file" accept={ACCEPT} multiple hidden
                   onChange={(e) => { addImages([...e.target.files]); e.target.value = ""; }} />
               </div>
             )}
@@ -310,9 +323,9 @@ export default function Ticket() {
                       {e.type === "STATUS" ? `Reason: ${e.body}` : <Body text={e.body} ids={e.mentions} people={p.people} meId={user.id} />}
                     </div>
                   )}
-                  {e.attachments?.length > 0 && (
+                  {e.attachments?.some(isImg) && (
                     <div className="gal sm">
-                      {e.attachments.map((a, i) => (
+                      {e.attachments.filter(isImg).map((a, i) => (
                         <div className="gi" key={a.id}>
                           <button className="gb" onClick={() => setView(a.id)} aria-label={`Open image ${i + 1} from ${e.actor.name}'s comment`}>
                             <AuthImage id={a.id} alt={`Image ${i + 1} in ${e.actor.name}'s comment`} />
@@ -321,6 +334,14 @@ export default function Ticket() {
                             <button className="gx" aria-label={`Remove image ${i + 1}`} onClick={() => run(() => api(`/attachments/${a.id}`, { method: "DELETE" }))}>×</button>
                           )}
                         </div>
+                      ))}
+                    </div>
+                  )}
+                  {e.attachments?.some((a) => !isImg(a)) && (
+                    <div className="fls">
+                      {e.attachments.filter((a) => !isImg(a)).map((a) => (
+                        <FileChip key={a.id} file={a}
+                          onRemove={(mgr || a.uploaderId === user.id) ? () => run(() => api(`/attachments/${a.id}`, { method: "DELETE" })) : undefined} />
                       ))}
                     </div>
                   )}
@@ -369,7 +390,7 @@ export default function Ticket() {
                 </button>
               ) : (
                 <div className="delbox">
-                  <p>Delete {p.key} for good? Its comments, activity and images will be removed too.</p>
+                  <p>Delete {p.key} for good? Its comments, activity, images and files will be removed too.</p>
                   <div className="acts">
                     <button className="btn danger" onClick={async () => { if (await run(async () => { await api(`/tickets/${p.key}`, { method: "DELETE" }); nav("/"); })) setConfirmDel(false); }}>Yes, delete ticket</button>
                     <button className="btn g" onClick={() => setConfirmDel(false)}>Cancel</button>

@@ -21,7 +21,7 @@ app.use("/api", auth, processRouter);
 // eslint-disable-next-line no-unused-vars
 app.use((e, _req, res, _next) => {
   if (e instanceof HttpError) return res.status(e.status).json({ error: e.message });
-  if (e?.type === "entity.too.large") return res.status(413).json({ error: "That file is too large. Images can be up to 8 MB" });
+  if (e?.type === "entity.too.large") return res.status(413).json({ error: "That file is too large. Files can be up to 10 MB" });
   if (e?.name === "ZodError") return res.status(400).json({ error: "Invalid input" });
   console.error(e);
   res.status(500).json({ error: "Something went wrong" });

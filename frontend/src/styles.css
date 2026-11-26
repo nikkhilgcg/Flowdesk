@@ -308,3 +308,16 @@ td .dd{min-width:150px}.decide .dd{width:200px}
 [data-theme="dark"] .tk-row{color:var(--mu)}
 [data-theme="dark"] .tk-key{color:var(--tx)}
 [data-theme="dark"] .tk-veil{background:radial-gradient(ellipse 44% 54% at 50% 50%,rgba(11,16,32,.98) 0,rgba(11,16,32,.85) 55%,rgba(11,16,32,0) 100%),radial-gradient(ellipse 90% 90% at 50% 50%,transparent 55%,rgba(11,16,32,.75) 100%)}
+
+/* files on tickets and comments (PDF, Word, Excel) */
+.fls{display:flex;flex-direction:column;gap:8px;margin-top:10px;max-width:420px}
+.fl{position:relative}
+.flb{display:flex;align-items:center;gap:10px;width:100%;text-align:left;padding:8px 38px 8px 8px;border:1px solid var(--bd);border-radius:10px;background:var(--sf);color:var(--tx);font:inherit;cursor:pointer;transition:border-color .12s,background .12s}
+.flb:hover{border-color:var(--ac);background:var(--col)}
+.fli{flex:none;width:38px;height:38px;border-radius:8px;display:grid;place-items:center;font-size:11px;font-weight:700;letter-spacing:.4px;color:#fff;background:var(--mu)}
+.fli.pdf{background:#d93025}.fli.doc{background:#2b5fd9}.fli.xls{background:#1e8e4e}
+.flt{min-width:0;display:flex;flex-direction:column;gap:1px}
+.flt b{font-size:13.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.flt small{font-size:12px;color:var(--mu)}
+.flx{position:absolute;top:50%;right:8px;transform:translateY(-50%);width:24px;height:24px;border-radius:50%;border:0;background:transparent;color:var(--mu);font-size:18px;line-height:1;cursor:pointer;display:grid;place-items:center}
+.flx:hover{background:var(--er);color:#fff}

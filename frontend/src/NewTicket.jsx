@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { api, imageProblem, uploadImage } from "./api";
-import { AuthImage, clipboardImages } from "./Images";
+import { ACCEPT, api, fileProblem, uploadFile } from "./api";
+import { AuthImage, FileChip, clipboardImages, isImg } from "./Images";
 import AddClient from "./AddClient";
 import Dropdown from "./Dropdown";
 import MentionField from "./MentionField";
@@ -15,7 +15,7 @@ export default function NewTicket({ onClose, onCreated }) {
   const [f, setF] = useState({ title: "", description: "", priority: "MEDIUM", dueDate: "", clientId: "", assigneeId: "" });
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
-  const [imgs, setImgs] = useState([]);        // images already uploaded: { id, name }
+  const [imgs, setImgs] = useState([]);        // images and files already uploaded: { id, name, mime, size }
   const [uploading, setUploading] = useState(0);
   const [drag, setDrag] = useState(false);
   const pick = useRef(null);
@@ -36,13 +36,13 @@ export default function NewTicket({ onClose, onCreated }) {
   const addFiles = async (files) => {
     setErr("");
     for (const f of files) {
-      const bad = imageProblem(f);
+      const bad = fileProblem(f);
       if (bad) { setErr(bad); continue; }
-      if (imgs.length + uploading >= 10) { setErr("A ticket can have up to 10 images"); break; }
+      if (imgs.length + uploading >= 10) { setErr("A ticket can have up to 10 attachments"); break; }
       setUploading((n) => n + 1);
       try {
-        const a = await uploadImage("/attachments", f);
-        setImgs((l) => [...l, { id: a.id, name: f.name || "Pasted image" }]);
+        const a = await uploadFile("/attachments", f);
+        setImgs((l) => [...l, { id: a.id, name: a.name || f.name || "Pasted image", mime: a.mime, size: a.size }]);
       } catch (e) { setErr(e.message); }
       setUploading((n) => n - 1);
     }
@@ -100,9 +100,9 @@ export default function NewTicket({ onClose, onCreated }) {
           onDrop={(e) => { e.preventDefault(); setDrag(false); addFiles([...e.dataTransfer.files]); }}
         >
           <MentionField id="d" value={f.description} onChange={(v) => set("description", v)} people={people} onPaste={onPaste} />
-          {(imgs.length > 0 || uploading > 0) && (
+          {(imgs.some(isImg) || uploading > 0) && (
             <div className="gal sm">
-              {imgs.map((x, i) => (
+              {imgs.filter(isImg).map((x, i) => (
                 <div className="gi" key={x.id}>
                   <AuthImage id={x.id} alt={`Image ${i + 1}: ${x.name}`} />
                   <button type="button" className="gx" onClick={() => removeImg(x.id)} aria-label={`Remove image ${i + 1}`}>×</button>
@@ -111,10 +111,15 @@ export default function NewTicket({ onClose, onCreated }) {
               {Array.from({ length: uploading }, (_, i) => <div className="gi up" key={"u" + i}><span className="imgph" aria-busy="true">Uploading…</span></div>)}
             </div>
           )}
+          {imgs.some((x) => !isImg(x)) && (
+            <div className="fls">
+              {imgs.filter((x) => !isImg(x)).map((x) => <FileChip key={x.id} file={x} onRemove={() => removeImg(x.id)} />)}
+            </div>
+          )}
           <div className="attbar">
-            <button type="button" className="lnk" onClick={() => pick.current.click()}>Add image</button>
-            <span>or paste a screenshot, or drop a file here</span>
-            <input ref={pick} type="file" accept="image/png,image/jpeg,image/gif,image/webp" multiple hidden
+            <button type="button" className="lnk" onClick={() => pick.current.click()}>Add file</button>
+            <span>or paste a screenshot, or drop a file here. Images, PDF, Word and Excel, up to 10 MB</span>
+            <input ref={pick} type="file" accept={ACCEPT} multiple hidden
               onChange={(e) => { addFiles([...e.target.files]); e.target.value = ""; }} />
           </div>
         </div>
