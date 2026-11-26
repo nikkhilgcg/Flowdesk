@@ -20,7 +20,7 @@ export default function ThemeToggle() {
   }, [theme]);
 
   const toggle = () => {
-    const next = theme === "dark" ? "light" : "dark";
+    const next = theme === "light" ? "dark" : "light";
     setTheme(next);
     try { localStorage.setItem(KEY, next); } catch {}
   };
