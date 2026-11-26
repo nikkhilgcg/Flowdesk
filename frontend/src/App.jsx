@@ -4,6 +4,7 @@ import { api } from "./api";
 import { useAuth } from "./auth";
 import { ROLE_LABEL } from "./lib";
 import Bell from "./Bell";
+import ThemeToggle from "./ThemeToggle";
 import Login from "./Login";
 import Register from "./Register";
 import People from "./People";
@@ -42,6 +43,7 @@ function Shell() {
         )}
         <span className="sp" />
         <div className="me">
+          <ThemeToggle />
           <Bell />
           <span className="who">{user.name}</span>
           <span className="rl">{ROLE_LABEL[user.role]}{user.client ? ` · ${user.client}` : ""}</span>

@@ -6,7 +6,7 @@ import NewTicket from "./NewTicket";
 import AddClient from "./AddClient";
 import Dropdown from "./Dropdown";
 import Loader from "./Loader";
-import { dueText, fdate, fmt, PRIO, SL, STATUSES } from "./lib";
+import { dueText, fdate, fmt, initials, PRIO, SL, STATUSES } from "./lib";
 import "./filters.css";
 
 const Prio = ({ p }) => <span className={`pc ${PRIO[p].css}`}><i />{PRIO[p].label}</span>;
@@ -127,7 +127,7 @@ export default function Board() {
           </p>
           <div className="stats">
             {STATUSES.map((s) => (
-              <div className="stat" key={s.key}><b>{count(s.key)}</b><span>{s.label}</span></div>
+              <div className={`stat ${s.css}`} key={s.key}><span><i className="sd" />{s.label}</span><b>{count(s.key)}</b></div>
             ))}
           </div>
         </>
@@ -169,8 +169,8 @@ export default function Board() {
             const col = s.key === "APPROVED" ? [...all].sort((a, b) => new Date(b.approvedAt ?? b.createdAt) - new Date(a.approvedAt ?? a.createdAt)) : all;
             const shown = s.key === "APPROVED" && !allDone ? col.slice(0, DONE_PREVIEW) : col;
             return (
-              <section className="col" key={s.key}>
-                <div className="ch"><span>{s.label}</span><span className="n">{all.length}</span></div>
+              <section className={`col ${s.css}`} key={s.key}>
+                <div className="ch"><span className="cn"><i className="sd" />{s.label}</span><span className="n">{all.length}</span></div>
                 {shown.map((p) => (
                   <Link className="card" to={`/${p.key}`} key={p.key}>
                     <div className="row">
@@ -180,11 +180,14 @@ export default function Board() {
                     <div className="ct">{p.title}</div>
                     {p.mention && <div className="mt">@ Mentions you</div>}
                     {p.reworkCount > 0 && <div className="rw">↺ Rework ×{p.reworkCount}</div>}
+                    <div className={`asg${p.assignee ? "" : " none"}`} title={p.assignee?.name}>
+                      {p.assignee && <span className="av" aria-hidden="true">{initials(p.assignee.name)}</span>}
+                      <span className="nm">{p.assignee ? p.assignee.name : "Unassigned"}</span>
+                    </div>
                     <div className="row foot">
                       <Prio p={p.priority} />
-                      {p.assignee && <span className="an" title={p.assignee.name}>{p.assignee.name}</span>}
+                      {(() => { const d = dueText(p.dueDate, p.status === "APPROVED"); return <div className={`due ${d.css}`}>{d.text}</div>; })()}
                     </div>
-                    {(() => { const d = dueText(p.dueDate, p.status === "APPROVED"); return <div className={`due ${d.css}`}>{d.text}</div>; })()}
                   </Link>
                 ))}
                 {s.key === "APPROVED" && col.length > DONE_PREVIEW && (

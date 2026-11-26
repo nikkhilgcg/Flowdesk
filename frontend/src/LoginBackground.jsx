@@ -2,11 +2,11 @@ import { useMemo } from "react";
 
 // Faded wall of sample tickets behind the sign-in card. Purely decorative (hidden from screen readers).
 const TAGS = {
-  Bug: ["#f4dcd5", "#8f3a28"], Feature: ["#d8eadf", "#064e3b"], Task: ["#eceeea", "#5d6b64"],
-  Design: ["#dde9f4", "#2f5a86"], Security: ["#f6e9cc", "#8a6516"], Docs: ["#e8e1f3", "#5b3f8c"],
+  Bug: ["#fdecec", "#b42324"], Feature: ["#e8eeff", "#1e45d6"], Task: ["#e9edf7", "#4b5873"],
+  Design: ["#e1f3fa", "#0b6a8a"], Security: ["#fff1d6", "#8a5a00"], Docs: ["#ede7ff", "#47329e"],
 };
-const PRI = { H: ["▲", "#c4553f"], M: ["■", "#d4a037"], L: ["▼", "#4a7fb5"] };
-const AV = ["#064e3b", "#4a7fb5", "#d4a037", "#c4553f", "#7b6aa8", "#5d6b64"];
+const PRI = { H: ["▲", "#e5484d"], M: ["■", "#e0a100"], L: ["▼", "#2f5bff"] };
+const AV = ["#1e45d6", "#2f5bff", "#0e7490", "#e5484d", "#7c5ce0", "#5b6785"];
 const INITIALS = ["AL", "RM", "JP", "NK", "SK", "TD"];
 const T = [
   ["Fix login timeout on mobile", "Bug", "H"], ["Add due dates to subtasks", "Feature", "M"], ["Write onboarding guide for admins", "Docs", "L"],
